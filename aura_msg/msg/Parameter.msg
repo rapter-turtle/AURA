@@ -2,8 +2,11 @@
 float64 acceptance_radius  
 float64 kp
 float64 kd 
-float64 default_thrust 
+float64 desired_velocity 
 float64 max_steer
 float64 max_thrust_diff
 float64 max_steer_diff
- 
+float64 max_thrust
+float64 kup 
+float64 kud
+float64 kui

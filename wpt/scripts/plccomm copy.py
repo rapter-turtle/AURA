@@ -47,13 +47,10 @@ class ActuatorSubscriber(Node):
         throttle = self.cal_throttle(int(msg.data[1]))# throttle = int(msg.actuator[3])
         steering = self.cal_steering(int(msg.data[0]))# steering = int(msg.actuator[1])
         clutch = self.cal_clutch(throttle)
-        bow_thrust = int(msg.data[2])
-        bow_direction = int(msg.data[3])
         # print("a")
 
-        # sock.sendto(self.plcPacket.makeWritePacket2(int(throttle), int(steering), int(clutch)), (self.plc_ip, self.plc_port))
-        sock.sendto(self.plcPacket.makeWritePacket3(int(throttle), int(steering), int(clutch), int(bow_thrust), int(bow_direction)), (self.plc_ip, self.plc_port))
-        print("sending: ", throttle, steering, clutch, bow_direction)
+        sock.sendto(self.plcPacket.makeWritePacket2(int(throttle), int(steering), int(clutch)), (self.plc_ip, self.plc_port))
+        print("sending: ", throttle, steering, clutch)
 
     # 0.5초마다 plc에게 'hello' 메시지를 보내는 send_read_request 메소드를 생성
     def send_read_request(self):
@@ -128,10 +125,8 @@ class ActuatorSubscriber(Node):
             return 0
 
     def cal_clutch(self, throttle):
-        if throttle <= 3 and throttle >= -3:
+        if throttle < 3:
             return 0
-        elif throttle < -3:
-            return 2
         else:
             return 1
 

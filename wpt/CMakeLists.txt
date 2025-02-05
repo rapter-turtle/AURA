@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED) 
 find_package(aura_msg REQUIRED) 
+find_package(geometry_msgs REQUIRED) 
 find_package(sensor_msgs REQUIRED)
 find_package(GeographicLib REQUIRED)
 find_package(tf2 REQUIRED)
@@ -31,6 +32,7 @@ install(PROGRAMS
   # Install Python files
   scripts/plccomm.py
   scripts/plc_test.py
+  scripts/heron_map_gui.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -44,10 +46,13 @@ add_executable(aura_wpt src/aura_wpt.cpp)
 ament_target_dependencies(aura_wpt rclcpp aura_msg tf2 sensor_msgs)     # CHANGE
 target_link_libraries(aura_wpt ${GeographicLib_LIBRARIES})
 
-add_executable(system_id src/si.cpp)
+add_executable(system_id src/SI.cpp)
 ament_target_dependencies(system_id rclcpp aura_msg tf2 sensor_msgs)     # CHANGE
 target_link_libraries(system_id ${GeographicLib_LIBRARIES})
 
+add_executable(ekf src/ekf_filter.cpp)
+ament_target_dependencies(ekf rclcpp aura_msg tf2 sensor_msgs geometry_msgs)     # CHANGE
+target_link_libraries(ekf ${GeographicLib_LIBRARIES})
 
 # Add the executable
 add_executable(wpt_publisher src/Lawnmower_pub.cpp)
@@ -65,6 +70,7 @@ install(TARGETS
   listener
   aura_wpt
   wpt_publisher
+  ekf
   system_id
   DESTINATION lib/${PROJECT_NAME})
 

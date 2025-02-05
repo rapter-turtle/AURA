@@ -257,6 +257,18 @@ class PLCPacket:
 		return struct.pack('40B15H', *self.write_header_buffer, 
 						   px4ToplcPacket.emtpy1, px4ToplcPacket.empty2, px4ToplcPacket.engine_thrust, px4ToplcPacket.clutch, px4ToplcPacket.steering_angle, px4ToplcPacket.trim_angle, px4ToplcPacket.empty3, px4ToplcPacket.engine_ignition, px4ToplcPacket.bow_thruster_power, px4ToplcPacket.bow_thruster_rev, px4ToplcPacket.reserved1, px4ToplcPacket.reserved2, px4ToplcPacket.reserved3, px4ToplcPacket.reserved4, px4ToplcPacket.reserved5)
 
+	def makeWritePacket3(self, throttle, steering, clutch, bow_thrust, bow_direction):
+		px4ToplcPacket = Px4ToPlcPacket()
+		px4ToplcPacket.engine_thrust = throttle
+		px4ToplcPacket.clutch = clutch
+		px4ToplcPacket.steering_angle = steering
+		px4ToplcPacket.trim_angle = 4
+		px4ToplcPacket.engine_ignition = 5
+		px4ToplcPacket.bow_thruster_power = bow_thrust
+		px4ToplcPacket.bow_thruster_rev = bow_direction
+		return struct.pack('40B15H', *self.write_header_buffer, 
+						   px4ToplcPacket.emtpy1, px4ToplcPacket.empty2, px4ToplcPacket.engine_thrust, px4ToplcPacket.clutch, px4ToplcPacket.steering_angle, px4ToplcPacket.trim_angle, px4ToplcPacket.empty3, px4ToplcPacket.engine_ignition, px4ToplcPacket.bow_thruster_power, px4ToplcPacket.bow_thruster_rev, px4ToplcPacket.reserved1, px4ToplcPacket.reserved2, px4ToplcPacket.reserved3, px4ToplcPacket.reserved4, px4ToplcPacket.reserved5)
+
 
 	def makeWritePacket(self):
 		px4ToplcPacket = Px4ToPlcPacket()

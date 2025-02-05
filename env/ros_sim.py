@@ -14,10 +14,18 @@ class ShipSimulator(Node):
         # ROS2 settings
         self.state_pub = self.create_publisher(Float64MultiArray, '/ekf/estimated_state', 10)
         self.imu_pub = self.create_publisher(Imu, '/imu/data', 10)
-        self.control_sub = self.create_subscription(ActuatorOutputs, 'mavros/actuator_outputs', self.control_callback, 10)
+        self.control_sub = self.create_subscription(Float64MultiArray, '/actuator_outputs', self.control_callback, 10)
 
         # Station keeping point in UTM coordinates (Easting, Northing)
-        station_keeping_point = np.array([291126, 4118387])
+        #Jeongok
+        x_actual_min = 289577.66
+        x_actual_max = 291591.05
+        y_actual_min = 4117065.30
+        y_actual_max = 4118523.52
+        
+        station_keeping_point = np.array([(x_actual_min+x_actual_max)*0.5, (y_actual_min+y_actual_max)*0.5])
+        # station_keeping_point = np.array([291126, 4118387])
+
 
         # Initialize state [x, y, psi, u, v, r]
         self.ship_state = np.zeros(6)
@@ -53,8 +61,9 @@ class ShipSimulator(Node):
             return (pwm - 1550) * 0.26
 
         # Convert actuator PWM inputs to control inputs
-        self.control_input[0] = convert_pwm_to_steering(msg.actuator[1])  # Steer
-        self.control_input[1] = convert_pwm_to_thrust(msg.actuator[3])  # Thrust
+        self.control_input[0] = 0.01*convert_pwm_to_steering(msg.data[0])  # Steer
+        self.control_input[1] = 0.0002*convert_pwm_to_thrust(msg.data[1])*convert_pwm_to_thrust(msg.data[1])  # Thrust
+        # print(self.control_input[1])
 
 
     def wave_disturbance(self, disturbance_state, wave_direction, wind_speed, omega, lamda, Kw, sigmaF1, sigmaF2, dt):
@@ -73,16 +82,16 @@ class ShipSimulator(Node):
 
     def recover_simulator(self, ship, control_input, dt):
         """Simulate the ship dynamics given the current state and control input."""
-        M = 37.758  # Mass [kg]
-        I = 18.35   # Inertial tensor [kg m^2]
-        Xu = 8.9149
-        Xuu = 11.2101
-        Nr = 16.9542
-        Nrrr = 12.8966
-        Yv = 15
-        Yvv = 3
-        Yr = 6
-        Nv = 6
+        M = 1.0  # Mass [kg]
+        I = 1.0   # Inertial tensor [kg m^2]
+        Xu = 0.1#0.081
+        Xuu = 0.0
+        Nr = 0.081*2
+        Nrrr = 0.0
+        Yv = 0.06*2
+        Yvv = 0
+        Yr = 0.081*0.5
+        Nv = 0.081*0.5
         dist = 0.3  # 30cm
 
         # Extract states and controls
@@ -144,8 +153,7 @@ class ShipSimulator(Node):
             (steer * dist - (Nr + Nrrr * r * r) * r - Nv * v + N_wind_force + N_wave_force) / I
         ])
 
-        
-
+    
         ship = xdot * dt + ship
 
         while ship[2] > np.pi:
@@ -176,7 +184,7 @@ class ShipSimulator(Node):
         imu_msg.angular_velocity.z = self.ship_state[5]
         imu_msg.linear_acceleration.x = self.ship_state[3]
         imu_msg.linear_acceleration.y = self.ship_state[4]
-
+ 
         self.imu_pub.publish(imu_msg)
 
     def run(self):
@@ -189,7 +197,8 @@ class ShipSimulator(Node):
         # Prepare the state message to publish
         state_msg = Float64MultiArray()
         # Now send lat, lon along with the ship's state (psi, u, v, r)
-        state_msg.data = np.concatenate(([lat, lon], self.ship_state[2:])).tolist()
+        state_msg.data = np.concatenate((self.ship_state,self.ship_state)).tolist()
+        # state_msg.data = np.concatenate(([lat, lon], self.ship_state[2:],[0,0,0,0,0,0,0,0,0,0,0])).tolist()
 
         self.state_pub.publish(state_msg)
 

@@ -25,9 +25,9 @@ class ActuatorPublisher : public rclcpp::Node
 public:
     ActuatorPublisher()
         : Node("actuator_publisher"),
-          k(0), x(0.0), y(0.0), u(0.0), v(0.0), r(0.0), Xu(0.081), LLOS(0.0), psi(0.0), received_(false),
-          acceptance_radius(3.0), Kp(300.0), Kd(0.0), Kup(300.0), Kud(0.0), Kui(0.1), max_I(1),
-          desired_velocity(4), max_steer(100), max_thrust(70), max_thrust_diff(0.5), max_steer_diff(0.5)
+          k(0), x(0.0), y(0.0), LLOS(0.0), psi(0.0), received_(false),
+          acceptance_radius(3.0), Kp(300.0), Kd(0.0),
+          default_thrust(0), max_steer(100), max_thrust_diff(0.5), max_steer_diff(0.5)
     {
         // RCLCPP_INFO(this->get_logger(), "Initializing ActuatorPublisher...");
 
@@ -36,8 +36,17 @@ public:
         utm_publisher_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("/ship/utm", 10);
 
         // Subscribers
-        subscriber_state_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-            "/ekf/estimated_state", 10, std::bind(&ActuatorPublisher::state_callback, this, std::placeholders::_1));
+        // subscriber_state_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+        //     "/ekf/estimated_state", 10,
+        //     std::bind(&ActuatorPublisher::estimated_state_callback, this, std::placeholders::_1));
+
+        subscriber_imu_ = this->create_subscription<sensor_msgs::msg::Imu>(
+            "/imu/data", 10, std::bind(&ActuatorPublisher::imu_callback, this, std::placeholders::_1));
+
+        subscriber_gps_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
+            "/fix", 10, std::bind(&ActuatorPublisher::gps_callback, this, std::placeholders::_1));
+
+
 
         subscriber_waypoints_ = this->create_subscription<aura_msg::msg::Waypoint>(
             "/waypoints", 10,
@@ -52,31 +61,106 @@ public:
             std::chrono::milliseconds(100),
             std::bind(&ActuatorPublisher::timer_callback, this));
 
+        // Initialize control parameters
+        // acceptance_radius = 3.0;
+        // Kp = 300.0;
+        // Kd = 0.0;
+        // default_thrust = 50;
+        // max_steer = 100;
         diff_thrust_before = 0.0;
         before_error_angle = 0.0;
         last_steering = 0.0;
         last_thrust = 0.0;
-        before_velocity_e = 0.0;
-        I_thrust = 0.0;
+
+        // RCLCPP_INFO(this->get_logger(), "ActuatorPublisher node started successfully");
     }
 
 private:
+    // void estimated_state_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+    // {
+    //     if (msg->data.size() >= 3)
+    //     {
+    //         double lat = msg->data[0];
+    //         double lon = msg->data[1];
+    //         psi = msg->data[2];
+    //         // RCLCPP_INFO(this->get_logger(), "Received state: lat=%.2f, lon=%.2f, Psi=%.2f", lat, lon, psi);
 
-    void state_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+    //         // Convert latitude and longitude to UTM coordinates
+    //         double utm_easting, utm_northing;
+    //         int zone;
+    //         bool northp;
+
+    //         GeographicLib::UTMUPS::Forward(lat, lon, zone, northp, utm_easting, utm_northing);
+
+    //         // Assign the converted coordinates
+    //         x = utm_easting;
+    //         y = utm_northing;
+
+    //         // Normalize psi to be within [-pi, pi]
+    //         if (psi > M_PI)
+    //             psi -= 2 * M_PI; 
+    //         else if (psi < -M_PI)
+    //             psi += 2 * M_PI;
+
+    //         // RCLCPP_INFO(this->get_logger(), "Received state: x=%.2f, y=%.2f, Psi=%.2f", x, y, psi);
+    //         received_ = true;
+    //     }
+    //     else
+    //     {
+    //         RCLCPP_WARN(this->get_logger(), "State message does not have enough data. Ignoring...");
+    //     }
+    // }
+
+    void imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
         // Extract yaw (psi) from quaternion
-        x = msg->data[0];
-        y = msg->data[1];
-        psi = msg->data[2];
-        u = msg->data[3];
-        v = msg->data[4];
-        r = msg->data[5];
-        
-        gps_received_ = true;
-        publishUtmCoordinates();
+        tf2::Quaternion quat(
+            msg->orientation.x,
+            msg->orientation.y,
+            msg->orientation.z,
+            msg->orientation.w);
+        double roll, pitch, yaw;
+        tf2::Matrix3x3(quat).getRPY(roll, pitch, yaw);
+        psi = yaw;
 
+        // Normalize psi to be within [-pi, pi]
+        if (psi > M_PI)
+            psi -= 2 * M_PI;
+        else if (psi < -M_PI)
+            psi += 2 * M_PI;
+        // RCLCPP_INFO(this->get_logger(), "psi=%.2f",psi);
+        // Indicate that we have received imu data
         imu_received_ = true;
     }
+
+    void gps_callback(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
+    {
+        if (msg->status.status >= 0) // Check if GPS data is valid
+        {
+            double lat = msg->latitude;
+            double lon = msg->longitude;
+
+            // Convert latitude and longitude to UTM coordinates
+            double utm_easting, utm_northing;
+            int zone;
+            bool northp;
+
+            GeographicLib::UTMUPS::Forward(lat, lon, zone, northp, utm_easting, utm_northing);
+
+            // Assign the converted coordinates
+            x = utm_easting;
+            y = utm_northing;
+            // RCLCPP_INFO(this->get_logger(), "x=%.2f, y=%.2f", x, y);
+            // Indicate that we have received GPS data
+            gps_received_ = true;
+            publishUtmCoordinates();
+        }
+        else
+        {
+            RCLCPP_WARN(this->get_logger(), "Invalid GPS data received. Ignoring...");
+        }
+    }
+
 
 
     void waypoints_callback(const aura_msg::msg::Waypoint::SharedPtr msg)
@@ -97,7 +181,10 @@ private:
                     msg->x_lat[i], msg->y_long[i], zone, northp, utm_easting, utm_northing
                 );
                 waypoints.emplace_back(utm_easting, utm_northing);
+
+                // RCLCPP_INFO(this->get_logger(), "Waypoint %zu: Lat=%.6f, Lon=%.6f -> UTM Easting=%.2f, Northing=%.2f", i, msg->x_lat[i], msg->y_long[i], utm_easting, utm_northing);
             }
+            // RCLCPP_INFO(this->get_logger(), "Loaded %zu waypoints", waypoints.size());
         }
         else
         {
@@ -111,14 +198,11 @@ private:
         acceptance_radius = msg->acceptance_radius;
         Kp = msg->kp;
         Kd = msg->kd;
-        desired_velocity = msg->desired_velocity/1.94384;
+        default_thrust = msg->default_thrust;
         max_steer = msg->max_steer;
         max_steer_diff = msg->max_steer_diff;
         max_thrust_diff = msg->max_thrust_diff;
-        Kup = msg->kup;
-        Kud = msg->kud;
-        Kui = msg->kui;
-        max_thrust = msg->max_thrust;
+
 
     }
 
@@ -156,6 +240,11 @@ private:
 
     void timer_callback()
     {
+        // if (!gps_received_ || !imu_received_)
+        // {
+        //     RCLCPP_WARN(this->get_logger(), "GPS or IMU data not yet received. Skipping timer callback.");
+        //     return;
+        // }
 
         if (k >= waypoints.size())
         {
@@ -188,20 +277,12 @@ private:
             steer_input = clamp(steer_input, -max_steer, max_steer);
             before_error_angle = error_angle;
 
-
-            double velocity_e = u - desired_velocity;
-            I_thrust = I_thrust + velocity_e;
-            I_thrust = clamp(I_thrust, -max_I, max_I);
-            double proposed_thrust = (Xu*u - Kup*velocity_e - Kud*(velocity_e - before_velocity_e) - Kui*I_thrust)/0.0002;  // Example calculation for thrust
-            proposed_thrust = sqrt(clamp(proposed_thrust, 0.0, max_thrust*max_thrust));
-            before_velocity_e = velocity_e;
-            RCLCPP_INFO(this->get_logger(), "vel_e =%f, proposed_thrust =%f, I_thrust =%f", velocity_e, proposed_thrust, I_thrust);
-
             // Apply rate limiting
             double steer_change = steer_input - last_steering;
             steer_change = clamp(steer_change, -max_steer_diff, max_steer_diff);
             double steer = last_steering + steer_change;
 
+            double proposed_thrust = default_thrust;  // Example calculation for thrust
             double thrust_change = proposed_thrust - last_thrust;
             thrust_change = clamp(thrust_change, -max_thrust_diff, max_thrust_diff);
             double thrust = last_thrust + thrust_change;
@@ -221,15 +302,15 @@ private:
             // std::fill(actuator_msg.actuator.begin(), actuator_msg.actuator.end(), 0.0f);
             actuator_msg.data.push_back(pwm_steer);// = [pwm_steer, pwm_thrust];
             actuator_msg.data.push_back(pwm_thrust);
-            actuator_msg.data.push_back(0.0);
-            actuator_msg.data.push_back(0.0);
             // actuator_msg.actuator[3] = pwm_thrust;
             RCLCPP_INFO(this->get_logger(), "WPT #=%d", k);
             RCLCPP_INFO(this->get_logger(), "steer=%.2f, thrust=%.2f", steer, thrust);
             RCLCPP_INFO(this->get_logger(), "LOS=%.2f, Distance=%.2f", LOS*180/M_PI, distance_to_wpt);
-            RCLCPP_INFO(this->get_logger(), "u=%.2f m/s, %.2f knots", u, u*1.94384);
 
-
+            // actuator_msg.actuator[1] = static_cast<float>(1000); // Steering control
+            // actuator_msg.actuator[3] = static_cast<float>(-1);            
+            // RCLCPP_INFO(this->get_logger(), "dx=%.2f, dy=%.2f", dx, steer);
+            // printf("pub1");
             publisher_->publish(actuator_msg);
             // printf("pub2");
             // RCLCPP_INFO(this->get_logger(), "###################################################################");
@@ -266,8 +347,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr subscriber_state_;
     rclcpp::Subscription<aura_msg::msg::Waypoint>::SharedPtr subscriber_waypoints_;
     rclcpp::Subscription<aura_msg::msg::Parameter>::SharedPtr subscriber_params_;
-    // rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscriber_imu_;
-    // rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr subscriber_gps_;
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscriber_imu_;
+    rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr subscriber_gps_;
 
     bool imu_received_ = false;
     bool gps_received_ = false;
@@ -278,9 +359,9 @@ private:
 
     // Data variables
     size_t k;
-    double x, y, psi, u, v, r, LLOS;
+    double x, y, psi, LLOS;
     std::vector<std::pair<double, double>> waypoints;
-    double acceptance_radius, Kp, Kd, Kup, Kud, Kui, Xu, desired_velocity, max_thrust, max_steer, diff_thrust_before, before_error_angle, max_thrust_diff, max_steer_diff, last_steering, last_thrust, before_velocity_e, I_thrust, max_I;
+    double acceptance_radius, Kp, Kd, default_thrust, max_steer, diff_thrust_before, before_error_angle, max_thrust_diff, max_steer_diff, last_steering, last_thrust;
     bool received_;
 };
 
