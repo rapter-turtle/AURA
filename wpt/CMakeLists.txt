@@ -39,6 +39,11 @@ install(PROGRAMS
 add_executable(talker src/ex_pub.cpp)
 ament_target_dependencies(talker rclcpp aura_msg)         # CHANGE
 
+add_executable(dp src/DP.cpp)
+target_include_directories(dp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+ament_target_dependencies(dp rclcpp aura_msg)
+
+
 add_executable(listener src/ex_sub.cpp)
 ament_target_dependencies(listener rclcpp aura_msg)     # CHANGE
 
@@ -72,6 +77,7 @@ install(TARGETS
   wpt_publisher
   ekf
   system_id
+  dp
   DESTINATION lib/${PROJECT_NAME})
 
 
