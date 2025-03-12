@@ -12,8 +12,9 @@ N = length(t);
 x = zeros(1, N); u = zeros(1, N);
 y = zeros(1, N); v = zeros(1, N);
 psi = zeros(1, N); r = zeros(1, N);
-psi(1) = -70*3.141592/180;
-y(1) = -10;
+psi(1) = -150*3.141592/180;
+y(1) = 25;
+x(1) = 5;
 
 tau_u = zeros(1, N);
 tau_r = zeros(1, N);
@@ -23,30 +24,32 @@ tu = 0;
 tr = 0;
 tv = 0;
 
-Fv = 30;
+Fv = 20;
 lf = 3.5;
 lb = -3;
-bow = 1.5;
+bow = 1;
 
-hp = 1.5;
+hp = 4;
 
 alpha1 = 1;
 alpha2 = 2;
 
-alphac= 0.5;
+alphac= 10;
 
 Tu_con = 0;
 Tv_con = 0;
 Tr_con = 0;
 
-acceptance_rad = 1;
+acceptance_rad = 0.2;
 
-eta_xd = 20;
-eta_yd = -19.5;
+eta_xd = 0;
+eta_yd = 0;
 
 xd = 0;
 yd = 0;
 
+a = 4;
+b = 4;
 
 %% Figure Setup
 fig = figure('Position', [100, 100, 1200, 600]); % Adjust figure size
@@ -59,10 +62,12 @@ grid on;
 xlabel('X Position');
 ylabel('Y Position');
 title('Ship Motion Simulation');
-xlim([-50, 50]); ylim([-50, 50]);
+xlim([-20, 20]); ylim([-5, 30]);
 
 % ** 정박지(Anchorage Area) 추가 **
-fill([-50 50 50 -50], [-50 -50 -20 -20], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
+fill([-50 50 50 -50], [-50 -50 0 0], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
+fill([2.5 5 5 2.5], [0 0 5 5], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
+fill([-2.5 -5 -5 -2.5], [0 0 5 5], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
 
 % Initial ship shape (Pentagon)
 ship_x = [3.5 2.5 -3 -3 2.5]; % Shape of the ship (pentagon)
@@ -81,6 +86,14 @@ center_y = [y(1) + lf * sin(theta), y(1) + lb * sin(theta)]; % 선두, 선미의
 circle_hf = rectangle('Position', [center_x(1)-acceptance_rad, center_y(1)-acceptance_rad, 2*acceptance_rad, 2*acceptance_rad], 'Curvature', [1, 1], 'EdgeColor', 'r', 'LineWidth', 2);
 circle_hb = rectangle('Position', [center_x(2)-acceptance_rad, center_y(2)-acceptance_rad, 2*acceptance_rad, 2*acceptance_rad], 'Curvature', [1, 1], 'EdgeColor', 'r', 'LineWidth', 2);
 
+% Add y = ln(x^2 + 1) plot in red
+x_vals = linspace(-20, 20, 1000);  % Define a range for x values
+y1_vals = a*log(x_vals.^2 + 1); 
+y2_vals = b*log(x_vals.^2 + 1); 
+
+% Plot the function in red
+plot( x_vals, y1_vals, 'r', 'LineWidth', 2);
+plot( x_vals, y2_vals, 'm', 'LineWidth', 2);
 
 % Add simulation time display (Top-left corner)
 time_text = text(-45, 45, 'Time: 0.00 s', 'FontSize', 12, 'Color', 'r');
@@ -104,6 +117,7 @@ line_tau_r = plot(ax(5), t(1), tau_r(1), 'r');
 line_tau_v = plot(ax(5), t(1), tau_v(1), 'g');
 line_psi = plot(ax(6), t(1), psi(1), 'k');
 
+
 % 세로선(Vertical Line) 추가
 for i = 1:6
     vline_x(i) = xline(ax(i), t(1), '--k', 'LineWidth', 1.2);
@@ -119,15 +133,45 @@ for i = 2:N
         r_dot = (-Nv*v(i-1) -Nr*r(i-1) - Nrrr*r(i-1)*r(i-1)*r(i-1))/I;        
 
         %CBF
-        hf = y(i-1) + lf*sin(psi(i-1)) + 20 - acceptance_rad;
-        hf_dot = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + r(i-1)*lf*cos(psi(i-1));
-        hf_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lf*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lf*r(i-1)*r(i-1)*sin(psi(i-1));
-        hf_cbf = (hf + alpha1*hf_dot + alpha2*(hf_dot + alpha1*hf_dotdot))/(alpha1*alpha2);
+        % hf = y(i-1) + lf*sin(psi(i-1)) + 20 - acceptance_rad;
+        % hf_dot = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + r(i-1)*lf*cos(psi(i-1));
+        % hf_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lf*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lf*r(i-1)*r(i-1)*sin(psi(i-1));
+        % hf_cbf = (hf + alpha1*hf_dot + alpha2*(hf_dot + alpha1*hf_dotdot))/(alpha1*alpha2);
+        % 
+        % hb = y(i-1) + lb*sin(psi(i-1)) + 20 - acceptance_rad;
+        % hb_dot = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + r(i-1)*lb*cos(psi(i-1));
+        % hb_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lb*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lb*r(i-1)*r(i-1)*sin(psi(i-1));
+        % hb_cbf = (hb + alpha1*hb_dot + alpha2*(hb_dot + alpha1*hb_dotdot))/(alpha1*alpha2);
 
-        hb = y(i-1) + lb*sin(psi(i-1)) + 20 - acceptance_rad;
-        hb_dot = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + r(i-1)*lb*cos(psi(i-1));
-        hb_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lb*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lb*r(i-1)*r(i-1)*sin(psi(i-1));
-        hb_cbf = (hb + alpha1*hb_dot + alpha2*(hb_dot + alpha1*hb_dotdot))/(alpha1*alpha2);
+        %CBF
+        
+        % x_f = x(i-1) + lf*cos(psi(i-1));
+        % y_f = y(i-1) + lf*sin(psi(i-1));
+        % x_dot_f = u(i-1)*cos(psi(i-1)) - v(i-1)*sin(psi(i-1)) - lf*r(i-1)*sin(psi(i-1));
+        % y_dot_f = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + lf*r(i-1)*cos(psi(i-1));
+        % hf = y_f - a*log(x_f*x_f + 1);
+        % hf_dot = yd - a*2*xd*xd/(xd*xd + 1);
+        % etayf = - a*2*xd/(xd*xd + 1);
+        % hf_cbf = hf + alpha1*hf_dot;
+        x_f = x(i-1) + lf*cos(psi(i-1));
+        y_f = y(i-1) + lf*sin(psi(i-1));
+        x_dot_f = u(i-1)*cos(psi(i-1)) - v(i-1)*sin(psi(i-1)) - lf*r(i-1)*sin(psi(i-1));
+        y_dot_f = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + lf*r(i-1)*cos(psi(i-1));        
+        hf = y_f - a*log(x_f*x_f + 1);
+        hf_dot = y_dot_f - 2*a*x_f*x_dot_f/(x_f*x_f + 1);
+        etayf = -2*a*x_f/(x_f*x_f + 1);
+        hf_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lf*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lf*r(i-1)*r(i-1)*sin(psi(i-1)) + 4*a*x_f*x_f*x_dot_f*x_dot_f/((x_f*x_f + 1)*(x_f*x_f + 1)) - 2*a*x_dot_f*x_dot_f/(x_f*x_f+1) + etayf*(-u(i-1)*r(i-1)*sin(psi(i-1)) - v(i-1)*r(i-1)*cos(psi(i-1)) - r(i-1)*r(i-1)*lf*cos(psi(i-1)));
+        hf_cbf = (hf + (alpha1 + alpha2)*hf_dot + alpha1*alpha2*hf_dotdot)/(alpha1*alpha2);
+
+        x_b = x(i-1) + lb*cos(psi(i-1));
+        y_b = y(i-1) + lb*sin(psi(i-1));
+        x_dot_b = u(i-1)*cos(psi(i-1)) - v(i-1)*sin(psi(i-1)) - lb*r(i-1)*sin(psi(i-1));
+        y_dot_b = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + lb*r(i-1)*cos(psi(i-1));        
+        hb = y_b - b*log(x_b*x_b + 1);
+        hb_dot = y_dot_b - 2*b*x_b*x_dot_b/(x_b*x_b + 1);
+        etayb = -2*b*x_f/(x_b*x_b + 1);
+        hb_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lb*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lb*r(i-1)*r(i-1)*sin(psi(i-1)) + 4*b*x_b*x_b*x_dot_b*x_dot_b/((x_b*x_b + 1)*(x_b*x_b + 1)) - 2*b*x_dot_b*x_dot_b/(x_b*x_b+1) + etayb*(-u(i-1)*r(i-1)*sin(psi(i-1)) - v(i-1)*r(i-1)*cos(psi(i-1)) - r(i-1)*r(i-1)*lb*cos(psi(i-1)));
+        hb_cbf = (hb + (alpha1 + alpha2)*hb_dot + alpha1*alpha2*hb_dotdot)/(alpha1*alpha2);
 
         %CLF
         eta_x = x(i-1) + hp*cos(psi(i-1));
@@ -153,13 +197,13 @@ for i = 2:N
         % x1^2 + x2^2 + x3^2 (이차 목적 함수)
         model.Q = sparse([1, 0, 0, 0, 0, 0, 0, 0, 0;
                           0, 1, 0, 0, 0, 0, 0, 0, 0;
-                          0, 0, 10000, 0, 0, 0, 0, 0, 0;
-                          0, 0, 0, 10000, 0, 0, 0, 0, 0;
+                          0, 0, 100000, 0, 0, 0, 0, 0, 0;
+                          0, 0, 0, 100000, 0, 0, 0, 0, 0;
                           0, 0, 0, 0, 10, 0, 0, 0, 0;
-                          0, 0, 0, 0, 0, 10, 0, 0, 0;
-                          0, 0, 0, 0, 0, 0, 10, 0, 0; ...
-                          0, 0, 0, 0, 0, 0, 0, 100000, 0; ...
-                          0, 0, 0, 0, 0, 0, 0, 0, 100000;]);  % 대각선에 1을 넣어서 각 변수를 제곱하는 형태로 설정
+                          0, 0, 0, 0, 0, 1000, 0, 0, 0;
+                          0, 0, 0, 0, 0, 0, 100000, 0, 0; ...
+                          0, 0, 0, 0, 0, 0, 0, 10000000, 0; ...
+                          0, 0, 0, 0, 0, 0, 0, 0, 10000000;]);  % 대각선에 1을 넣어서 각 변수를 제곱하는 형태로 설정
         model.obj = [0, 0, 0, 0, 0, 0, 0, 0, 0];  % 1차 항은 0 (단지 제곱 항만 목적 함수로 사용)
 
 
@@ -169,8 +213,10 @@ for i = 2:N
             0, (eta_y - eta_yd)*control_update_dt, 0, 1, 0, 0, 0, 0, 0;
             -1, 0, 0, 0, cos(psi(i-1))/M, -hp*sin(psi(i-1))/I, -Fv*sin(psi(i-1))/M - Fv*bow*hp*sin(psi(i-1))/I, 0, 0;
             0, -1, 0, 0, sin(psi(i-1))/M, hp*cos(psi(i-1))/I, Fv*cos(psi(i-1))/M + Fv*bow*hp*cos(psi(i-1))/I, 0, 0;
-            0, 0, 0, 0, -sin(psi(i-1))/M, -lf*cos(psi(i-1))/I, -Fv*cos(psi(i-1))/M - lf*bow*Fv*cos(psi(i-1))/I, 1, 0;
-            0, 0, 0, 0, -sin(psi(i-1))/M, -lb*cos(psi(i-1))/I, -Fv*cos(psi(i-1))/M - lb*bow*Fv*cos(psi(i-1))/I, 0, 1;            
+            % 0, 0, 0, 0, -sin(psi(i-1))/M, -lf*cos(psi(i-1))/I, -Fv*cos(psi(i-1))/M - lf*bow*Fv*cos(psi(i-1))/I, 1, 0;
+            % 0, 0, 0, 0, -sin(psi(i-1))/M, -lb*cos(psi(i-1))/I, -Fv*cos(psi(i-1))/M - lb*bow*Fv*cos(psi(i-1))/I, 0, 1;  
+            0, 0, 0, 0, -(sin(psi(i-1)) + etayf*cos(psi(i-1)))/M, -lf*(cos(psi(i-1)) - etayf*sin(psi(i-1)))/I, -Fv*(cos(psi(i-1)) - etayf*sin(psi(i-1)))/M - lf*bow*Fv*(cos(psi(i-1)) - etayf*sin(psi(i-1)))/I, 1, 0;
+            0, 0, 0, 0, -(sin(psi(i-1)) + etayb*cos(psi(i-1)))/M, -lb*(cos(psi(i-1)) - etayb*sin(psi(i-1)))/I, -Fv*(cos(psi(i-1)) - etayb*sin(psi(i-1)))/M - lb*bow*Fv*(cos(psi(i-1)) - etayb*sin(psi(i-1)))/I, 0, 1;              
         ]);
 
         model.rhs = [-alphac*clfxd - (eta_x - eta_xd)*xd;-alphac*clfyd- (eta_y - eta_yd)*yd; clf_x; clf_y; hf_cbf; hb_cbf];
@@ -183,10 +229,12 @@ for i = 2:N
         % 모델 최적화 실행
         result = gurobi(model,struct('OutputFlag', 0));
 
-        disp(['x1 (실수 변수): ', num2str(result.x(1))]);
-        disp(['x2 (실수 변수): ', num2str(result.x(2))]);
-        disp(['x3 (실수 변수): ', num2str(result.x(3))]);
-        disp(['x4 (실수 변수): ', num2str(result.x(4))]);
+        % disp(['x1 (실수 변수): ', num2str(result.x(1))]);
+        % disp(['x2 (실수 변수): ', num2str(result.x(2))]);
+        % disp(['x3 (실수 변수): ', num2str(result.x(3))]);
+        disp(['CBF heading: ', num2str(hf)]);
+        disp(['slack heading : ', num2str(result.x(8))]);
+        disp(['slack back : ', num2str(result.x(9))]);
 
         tu = result.x(5);  % Surge force
         tr = result.x(6) + Fv*bow*result.x(7);%result.x(3) + Fv*bow*result.x(1);    % Yaw torque
