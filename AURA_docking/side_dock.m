@@ -12,9 +12,9 @@ N = length(t);
 x = zeros(1, N); u = zeros(1, N);
 y = zeros(1, N); v = zeros(1, N);
 psi = zeros(1, N); r = zeros(1, N);
-psi(1) = -150*3.141592/180;
-y(1) = 30;
-x(1) = 10;
+psi(1) = 5*3.141592/180;
+y(1) = 10;
+x(1) = -10;
 
 tau_u = zeros(1, N);
 tau_r = zeros(1, N);
@@ -30,13 +30,13 @@ lf = 3.5;
 lb = -3.0;
 bow = 1;
 
-hp = 4;
+hp = 1.0;
 
-alpha1 = 2;
-alpha2 = 1;
+alpha1 = 1;
+alpha2 = 0.1;
 
-alpha1b = 2;
-alpha2b = 5;
+alpha1b = 0.1;
+alpha2b = 0.2;
 
 alphac= 10;
 
@@ -51,6 +51,8 @@ eta_yd = 0;
 
 xd = 0;
 yd = 0;
+
+xd_back = -2*hp;
 
 a = 4;
 b = 4;
@@ -69,9 +71,9 @@ title('Ship Motion Simulation');
 xlim([-20, 20]); ylim([-5, 30]);
 
 % ** 정박지(Anchorage Area) 추가 **
-fill([-50 50 50 -50], [-50 -50 0 0], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
-fill([2.5 5 5 2.5], [0 0 5 5], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
-fill([-2.5 -5 -5 -2.5], [0 0 5 5], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
+fill([-10 10 10 -10], [-50 -50 -1.5 -1.5], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
+% fill([2.5 5 5 2.5], [0 0 5 5], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
+% fill([-2.5 -5 -5 -2.5], [0 0 5 5], [0.7 0.7 0.7], 'EdgeColor', 'none', 'FaceAlpha', 0.5);
 
 % Initial ship shape (Pentagon)
 ship_x = [3.5 2.5 -3 -3 2.5]; % Shape of the ship (pentagon)
@@ -96,8 +98,8 @@ y1_vals = a*log(x_vals.^2 + 1);
 y2_vals = b*log(x_vals.^2 + 1); 
 
 % Plot the function in red
-plot( x_vals, y1_vals, 'r', 'LineWidth', 2);
-plot( x_vals, y2_vals, 'm', 'LineWidth', 2);
+% plot( x_vals, y1_vals, 'r', 'LineWidth', 2);
+% plot( x_vals, y2_vals, 'm', 'LineWidth', 2);
 
 % Add simulation time display (Top-left corner)
 time_text = text(-45, 45, 'Time: 0.00 s', 'FontSize', 12, 'Color', 'r');
@@ -141,30 +143,29 @@ for i = 2:N
         y_f = y(i-1) + lf*sin(psi(i-1));
         x_dot_f = u(i-1)*cos(psi(i-1)) - v(i-1)*sin(psi(i-1)) - lf*r(i-1)*sin(psi(i-1));
         y_dot_f = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + lf*r(i-1)*cos(psi(i-1));        
-        hf = y_f - a*log(x_f*x_f + 1);
-        hf_dot = y_dot_f - 2*a*x_f*x_dot_f/(x_f*x_f + 1);
-        etayf = -2*a*x_f/(x_f*x_f + 1);
-        hf_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lf*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lf*r(i-1)*r(i-1)*sin(psi(i-1)) + 4*a*x_f*x_f*x_dot_f*x_dot_f/((x_f*x_f + 1)*(x_f*x_f + 1)) - 2*a*x_dot_f*x_dot_f/(x_f*x_f+1) + etayf*(-u(i-1)*r(i-1)*sin(psi(i-1)) - v(i-1)*r(i-1)*cos(psi(i-1)) - r(i-1)*r(i-1)*lf*cos(psi(i-1)));
+        hf = y_f + 0.5;
+        hf_dot = y_dot_f;
+        hf_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lf*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lf*r(i-1)*r(i-1)*sin(psi(i-1));
         hf_cbf = (hf + (alpha1 + alpha2)*hf_dot + alpha1*alpha2*hf_dotdot)/(alpha1*alpha2);
 
-        % x_b = x(i-1) + lb*cos(psi(i-1));
-        % y_b = y(i-1) + lb*sin(psi(i-1));
-        % x_dot_b = u(i-1)*cos(psi(i-1)) - v(i-1)*sin(psi(i-1)) - lb*r(i-1)*sin(psi(i-1));
-        % y_dot_b = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + lb*r(i-1)*cos(psi(i-1));        
-        % hb = y_b - b*log(x_b*x_b + 1);
-        % hb_dot = y_dot_b - 2*b*x_b*x_dot_b/(x_b*x_b + 1);
-        % etayb = -2*b*x_b/(x_b*x_b + 1);
-        % hb_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lb*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lb*r(i-1)*r(i-1)*sin(psi(i-1)) + 4*b*x_b*x_b*x_dot_b*x_dot_b/((x_b*x_b + 1)*(x_b*x_b + 1)) - 2*b*x_dot_b*x_dot_b/(x_b*x_b+1) + etayb*(-u(i-1)*r(i-1)*sin(psi(i-1)) - v(i-1)*r(i-1)*cos(psi(i-1)) - r(i-1)*r(i-1)*lb*cos(psi(i-1)));
-        % hb_cbf = (hb + (alpha1 + alpha2)*hb_dot + alpha1*alpha2*hb_dotdot)/(alpha1*alpha2);
+
         x_b = x(i-1) + lb*cos(psi(i-1));
         y_b = y(i-1) + lb*sin(psi(i-1));
         x_dot_b = u(i-1)*cos(psi(i-1)) - v(i-1)*sin(psi(i-1)) - lb*r(i-1)*sin(psi(i-1));
         y_dot_b = u(i-1)*sin(psi(i-1)) + v(i-1)*cos(psi(i-1)) + lb*r(i-1)*cos(psi(i-1));        
-        hb = y_b - a*log(x_b*x_b + 1);
-        hb_dot = y_dot_b - 2*a*x_b*x_dot_b/(x_b*x_b + 1);
-        etayb = -2*a*x_b/(x_b*x_b + 1);
-        hb_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lb*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lb*r(i-1)*r(i-1)*sin(psi(i-1)) + 4*a*x_b*x_b*x_dot_b*x_dot_b/((x_b*x_b + 1)*(x_b*x_b + 1)) - 2*a*x_dot_b*x_dot_b/(x_b*x_b+1) + etayb*(-u(i-1)*r(i-1)*sin(psi(i-1)) - v(i-1)*r(i-1)*cos(psi(i-1)) - r(i-1)*r(i-1)*lb*cos(psi(i-1)));
-        hb_cbf = (hb + (alpha1b + alpha2b)*hb_dot + alpha1b*alpha2b*hb_dotdot)/(alpha1b*alpha2b);
+        hb = y_b + 0.5;
+        hb_dot = y_dot_b;
+        hb_dotdot = u_dot*sin(psi(i-1)) + v_dot*cos(psi(i-1)) + lb*r_dot*cos(psi(i-1)) + u(i-1)*r(i-1)*cos(psi(i-1)) - v(i-1)*r(i-1)*sin(psi(i-1)) - lb*r(i-1)*r(i-1)*sin(psi(i-1));
+        hb_cbf = (hb + (alpha1 + alpha2)*hb_dot + alpha1*alpha2*hb_dotdot)/(alpha1*alpha2);
+
+        yaw_coeff = ((60/10)*3.141592/180)^2;
+        margin = 0.5;
+        hyaw = -psi(i-1)*psi(i-1) + yaw_coeff*y(i-1)*y(i-1) + (margin*3.141592/180)*(margin*3.141592/180);
+        y_dot_clf = u(i-1)*cos(psi(i-1)) - v(i-1)*sin(psi(i-1));
+        y_dotdot_clf = u_dot*cos(psi(i-1)) - v_dot*sin(psi(i-1)) - u(i-1)*r(i-1)*sin(psi(i-1)) - v(i-1)*r(i-1)*cos(psi(i-1));
+        hyaw_dot = -2*psi(i-1)*r(i-1) + 2*yaw_coeff*y(i-1)*y_dot_clf;
+        hyaw_dotdot = -2*r(i-1)*r(i-1)-2*psi(i-1)*r_dot + 2*yaw_coeff*y_dot_clf*y_dot_clf + 2*yaw_coeff*y(i-1)*y_dotdot_clf;
+        hyaw_cbf = (hyaw + (alpha1b + alpha2b)*hyaw_dot + alpha1b*alpha2b*hyaw_dotdot)/(alpha1b*alpha2b);
 
 
         %CLF
@@ -179,6 +180,7 @@ for i = 2:N
         clfxd = (eta_x - eta_xd)*(eta_x - eta_xd);
         clfyd = (eta_y - eta_yd)*(eta_y - eta_yd);
 
+
         %CBF
         %% MILP CBF
         % Gurobi 모델 생성
@@ -186,34 +188,44 @@ for i = 2:N
 
         % 목적 함수 정의 (비용 함수가 제곱 형태)
         % x1^2 + x2^2 + x3^2 (이차 목적 함수)
-        model.Q = sparse([1, 0, 0, 0, 0, 0, 0, 0, 0;
-                          0, 1, 0, 0, 0, 0, 0, 0, 0;
-                          0, 0, 100000, 0, 0, 0, 0, 0, 0;
-                          0, 0, 0, 100000, 0, 0, 0, 0, 0;
-                          0, 0, 0, 0, 10000, 0, 0, 0, 0;
-                          0, 0, 0, 0, 0, 1, 0, 0, 0;
-                          0, 0, 0, 0, 0, 0, 10000000, 0, 0; ...
-                          0, 0, 0, 0, 0, 0, 0, 100000000, 0; ...
-                          0, 0, 0, 0, 0, 0, 0, 0, 100000000;]);  % 대각선에 1을 넣어서 각 변수를 제곱하는 형태로 설정
-        model.obj = [0, 0, 0, 0, 0, 0, 0, 0, 0];  % 1차 항은 0 (단지 제곱 항만 목적 함수로 사용)
+        model.Q = sparse([1, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+                          0, 1, 0, 0, 0, 0, 0, 0, 0, 0;
+                          0, 0, 100000, 0, 0, 0, 0, 0, 0, 0;
+                          0, 0, 0, 100000, 0, 0, 0, 0, 0, 0;
+                          0, 0, 0, 0, 10000, 0, 0, 0, 0, 0;
+                          0, 0, 0, 0, 0, 1, 0, 0, 0, 0;
+                          0, 0, 0, 0, 0, 0, 1000, 0, 0, 0; ...
+                          0, 0, 0, 0, 0, 0, 0, 100000000, 0, 0; ...
+                          0, 0, 0, 0, 0, 0, 0, 0, 100000000, 0; ...
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 100000000;]);  % 대각선에 1을 넣어서 각 변수를 제곱하는 형태로 설정
+        model.obj = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];  % 1차 항은 0 (단지 제곱 항만 목적 함수로 사용)
+
+        % yaw_coeff = 1;
+        % hyaw = -psi(i-1)*psi(i-1) + yaw_coeff*y(i-1)*y(i-1);
+        % y_dot_clf = u(i-1)*cos(psi(i-1)) - v(i-1)*sin(psi(i-1));
+        % y_dotdot_clf = u_dot*cos(psi(i-1)) - v_dot*sin(psi(i-1)) - u(i-1)*r(i-1)*sin(psi(i-1)) - v(i-1)*r(i-1)*cos(psi(i-1));
+        % hyaw_dot = -2*psi(i-1)*r(i-1) + 2*yaw_coeff*y(i-1)*y_dot_clf;
+        % hyaw_dotdot = -2*r(i-1)*r(i-1)-2*psi(i-1)*r_dot + 2*yaw_coeff*y_dot_clf*y_dot_clf + 2*yaw_coeff*y(i-1)*y_dotdot_clf;
+        % hyaw_cbf = (hyaw + (alpha1b + alpha2b)*hyaw_dot + alpha1b*alpha2b*hyaw_dotdot)/(alpha1b*alpha2b);
 
 
         % 제약 조건 정의
         model.A = sparse([        
-            (eta_x - eta_xd)*control_update_dt, 0, 1, 0, 0, 0, 0, 0, 0;
-            0, (eta_y - eta_yd)*control_update_dt, 0, 1, 0, 0, 0, 0, 0;
-            -1, 0, 0, 0, cos(psi(i-1))/M, -hp*sin(psi(i-1))/I, -Fv*sin(psi(i-1))/M - Fv*bow*hp*sin(psi(i-1))/I, 0, 0;
-            0, -1, 0, 0, sin(psi(i-1))/M, hp*cos(psi(i-1))/I, Fv*cos(psi(i-1))/M + Fv*bow*hp*cos(psi(i-1))/I, 0, 0;
-            0, 0, 0, 0, -(sin(psi(i-1)) + etayf*cos(psi(i-1)))/M, -lf*(cos(psi(i-1)) - etayf*sin(psi(i-1)))/I, -Fv*(cos(psi(i-1)) - etayf*sin(psi(i-1)))/M - lf*bow*Fv*(cos(psi(i-1)) - etayf*sin(psi(i-1)))/I, 1, 0;
-            0, 0, 0, 0, -(sin(psi(i-1)) + etayb*cos(psi(i-1)))/M, -lb*(cos(psi(i-1)) - etayb*sin(psi(i-1)))/I, -Fv*(cos(psi(i-1)) - etayb*sin(psi(i-1)))/M - lb*bow*Fv*(cos(psi(i-1)) - etayb*sin(psi(i-1)))/I, 0, 1;              
+            (eta_x - eta_xd)*control_update_dt, 0, 1, 0, 0, 0, 0, 0, 0, 0;
+            0, (eta_y - eta_yd)*control_update_dt, 0, 1, 0, 0, 0, 0, 0, 0;
+            -1, 0, 0, 0, cos(psi(i-1))/M, -hp*sin(psi(i-1))/I, -Fv*sin(psi(i-1))/M - Fv*bow*hp*sin(psi(i-1))/I, 0, 0, 0;
+            0, -1, 0, 0, sin(psi(i-1))/M, hp*cos(psi(i-1))/I, Fv*cos(psi(i-1))/M + Fv*bow*hp*cos(psi(i-1))/I, 0, 0, 0;
+            0, 0, 0, 0, -sin(psi(i-1))/M, -lf*cos(psi(i-1))/I, -Fv*cos(psi(i-1))/M - lf*bow*Fv*cos(psi(i-1))/I, 1, 0, 0;
+            0, 0, 0, 0, -sin(psi(i-1))/M, -lb*cos(psi(i-1))/I, -Fv*cos(psi(i-1))/M - lb*bow*Fv*cos(psi(i-1))/I, 0, 1, 0;
+            0, 0, 0, 0, 0, -2*psi(i-1)*lb*cos(psi(i-1))/I, -2*psi(i-1)*lb*bow*Fv*cos(psi(i-1))/I, 0, 0, 1;              
         ]);
 
-        model.rhs = [-alphac*clfxd - (eta_x - eta_xd)*xd;-alphac*clfyd- (eta_y - eta_yd)*yd; clf_x; clf_y; hf_cbf; hb_cbf+10000];
-        model.sense = ['<','<','=','=', '<','<'];  
+        model.rhs = [-alphac*clfxd - (eta_x - eta_xd)*xd;-alphac*clfyd- (eta_y - eta_yd)*yd; clf_x; clf_y; hf_cbf; hb_cbf; hyaw_cbf];
+        model.sense = ['<','<','=','=', '<','<','<'];  
         model.modelsense = 'min';  % 최소화 문제
-        model.lb = [-inf; -inf; -inf; -inf; -40; -20; -1.5; -inf; -inf];  % 변수 각각 음수 값이 허용
-        model.ub = [inf; inf; inf; inf; 40; 20; 1.5; inf; inf];  % 상한 설정
-        model.vtype = 'CCCCCCICC';   
+        model.lb = [-inf; -inf; -inf; -inf; -40; -20; -0.5; -inf; -inf; -inf];  % 변수 각각 음수 값이 허용
+        model.ub = [inf; inf; inf; inf; 40; 20; 0.5; inf; inf; inf];  % 상한 설정
+        model.vtype = 'CCCCCCICCC';   
 
         % 모델 최적화 실행
         result = gurobi(model,struct('OutputFlag', 0));
