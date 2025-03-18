@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-
 import rclpy
 from rclpy.node import Node
 from aura_msg.msg import Waypoint
 from pyproj import Proj, transform
+import geopy.distance
+import math
 
 class WaypointPublisher(Node):
-
     def __init__(self):
         super().__init__('waypoint_publisher')
         self.gps_publisher = self.create_publisher(Waypoint, '/waypoints', 10)
@@ -15,17 +15,16 @@ class WaypointPublisher(Node):
         self.timer = self.create_timer(0.1, self.publish_waypoints)
         self.get_logger().info('Waypoint Publisher Node has been started.')
 
-        # Define GPS waypoints (latitude, longitude)
-        #self.wpt_x = [37.1829005, 37.1876142, 37.1870086, 37.1875402]
-        #self.wpt_y = [126.6387619, 126.6467351, 126.6471958, 126.6475287]
-        # self.wpt_x = [37.1836374, 37.1834013, 37.1832026]
-        # self.wpt_y = [126.6384293, 126.6390194, 126.6384913]
-        self.wpt_x = [37.1836374, 37.1834446, 37.1829854, 37.1832026]#37.1834446 #37.1833562
-        self.wpt_y = [126.6384293, 126.6402458, 126.6401691, 126.6384913]#126.6402458 #126.6401821
+        # Define square properties: center (latitude, longitude), width, height, and rotation angle
+        self.center_lat = 37.1835000
+        self.center_lon = 126.6395000
+        self.width_m = 150  # Width in meters
+        self.height_m = 50  # Height in meters
+        self.angle_deg = 60  # Rotation angle in degrees
 
-        self.x_offset = -2000.0
-        self.y_offset = 200.0
-
+        # Compute the four corners of the rotated square
+        self.wpt_x, self.wpt_y = self.compute_rotated_square_waypoints()
+        
         # Create Proj objects for WGS84 and UTM conversion
         self.wgs84_proj = Proj(proj='latlong', datum='WGS84')
         self.utm_proj = Proj(proj='utm', zone=52, datum='WGS84')  # Adjust zone as needed
@@ -41,11 +40,37 @@ class WaypointPublisher(Node):
             except Exception as e:
                 self.get_logger().error(f"Error converting GPS to UTM: {e}")
 
+    def compute_rotated_square_waypoints(self):
+        """Compute the four waypoints of a rotated square given center, width, height, and angle."""
+        half_width = self.width_m / 2.0
+        half_height = self.height_m / 2.0
+        angle_rad = math.radians(self.angle_deg)
+
+        # Compute offsets for rotation
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
+
+        offsets = [
+            (-half_width * cos_a - half_height * sin_a, -half_width * sin_a + half_height * cos_a),
+            (half_width * cos_a - half_height * sin_a, half_width * sin_a + half_height * cos_a),
+            (half_width * cos_a + half_height * sin_a, half_width * sin_a - half_height * cos_a),
+            (-half_width * cos_a + half_height * sin_a, -half_width * sin_a - half_height * cos_a),
+        ]
+
+        waypoints = []
+        for dx, dy in offsets:
+            lat_lon = geopy.distance.distance(meters=dy).destination(
+                geopy.distance.distance(meters=dx).destination((self.center_lat, self.center_lon), 90), 0)
+            waypoints.append((lat_lon.latitude, lat_lon.longitude))
+
+        wpt_x, wpt_y = zip(*waypoints)
+        return list(wpt_x), list(wpt_y)
+
     def publish_waypoints(self):
         # Publish GPS waypoints
         gps_msg = Waypoint()
-        gps_msg.x_lat = self.wpt_x
-        gps_msg.y_long = self.wpt_y
+        gps_msg.x_lat = list(self.wpt_x)
+        gps_msg.y_long = list(self.wpt_y)
         self.gps_publisher.publish(gps_msg)
         self.get_logger().info(f'Published GPS waypoints: x_lat={gps_msg.x_lat}, y_long={gps_msg.y_long}')
 

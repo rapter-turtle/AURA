@@ -368,7 +368,7 @@ private:
         // Assign values to the message's data field
         state_msg->data[0] = x_(0); // X position
         state_msg->data[1] = x_(1); // Y position
-        state_msg->data[2] = x_(2); // Psi (yaw angle)
+        state_msg->data[2] = x_(2) + 5*3.141592/180; // Psi (yaw angle)
         state_msg->data[3] = x_(3); // U (velocity in the x direction)
         state_msg->data[4] = x_(4); // V (velocity in the y direction)
         state_msg->data[5] = x_(5); // R (yaw rate)

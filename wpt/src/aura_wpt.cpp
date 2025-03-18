@@ -26,8 +26,8 @@ public:
     ActuatorPublisher()
         : Node("actuator_publisher"),
           k(0), x(0.0), y(0.0), u(0.0), v(0.0), r(0.0), Xu(0.081), LLOS(0.0), psi(0.0), received_(false),
-          acceptance_radius(3.0), Kp(300.0), Kd(0.0), Kup(300.0), Kud(0.0), Kui(0.1), max_I(1),
-          desired_velocity(4), max_steer(100), max_thrust(70), max_thrust_diff(0.5), max_steer_diff(0.5)
+          acceptance_radius(3.0), Kp(300.0), Kd(0.0), Kup(10.0), Kud(0.0), Kui(0.1), max_I(1),
+          desired_velocity(5/1.94384), max_steer(100), max_thrust(70), max_thrust_diff(0.5), max_steer_diff(0.5)
     {
         // RCLCPP_INFO(this->get_logger(), "Initializing ActuatorPublisher...");
 
@@ -182,7 +182,7 @@ private:
             else if (LOS < -M_PI)
                 LOS += 2 * M_PI;
             LLOS = LOS;
-
+ 
             double error_angle = LOS;
             double steer_input = Kp * error_angle + Kd * (error_angle - before_error_angle);
             steer_input = clamp(steer_input, -max_steer, max_steer);
@@ -190,12 +190,17 @@ private:
 
 
             double velocity_e = u - desired_velocity;
-            I_thrust = I_thrust + velocity_e;
-            I_thrust = clamp(I_thrust, -max_I, max_I);
-            double proposed_thrust = (Xu*u - Kup*velocity_e - Kud*(velocity_e - before_velocity_e) - Kui*I_thrust)/0.0002;  // Example calculation for thrust
+            I_thrust = I_thrust + velocity_e*0.1;
+            I_thrust = clamp(I_thrust, -70.0, 70.0);
+            // double proposed_thrust = (100.0*desired_velocity);  // Example calculation for thrust
+            double proposed_thrust = (5.0*desired_velocity + Xu*u- Kup*velocity_e- Kud*(velocity_e - before_velocity_e) - Kui*I_thrust);  // Example calculation for thrust
+            // double proposed_thrust = (Xu*u - Kup*velocity_e - Kud*(velocity_e - before_velocity_e) - Kui*I_thrust)/0.0002;  // Example calculation for thrust
+            
             proposed_thrust = sqrt(clamp(proposed_thrust, 0.0, max_thrust*max_thrust));
             before_velocity_e = velocity_e;
             RCLCPP_INFO(this->get_logger(), "vel_e =%f, proposed_thrust =%f, I_thrust =%f", velocity_e, proposed_thrust, I_thrust);
+            // RCLCPP_INFO(this->get_logger(), "vel_e =%f, proposed_thrust =%f, I_thrust =%f", velocity_e, proposed_thrust, I_thrust);
+
 
             // Apply rate limiting
             double steer_change = steer_input - last_steering;
