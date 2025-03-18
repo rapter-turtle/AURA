@@ -50,7 +50,7 @@ class ShipSimulator(Node):
         def convert_pwm_to_steering(pwm):
             # Assuming steering PWM range is 1000 to 2000 and maps to [-pi/6, pi/6]
             pwm_center = 1500
-            pwm_per_radian = 50
+            pwm_per_radian = 1.6667
             return (pwm - pwm_center) / pwm_per_radian
 
         # Convert PWM to thrust
@@ -61,8 +61,8 @@ class ShipSimulator(Node):
             return (pwm - 1550) * 0.26
 
         # Convert actuator PWM inputs to control inputs
-        self.control_input[0] = 0.01*convert_pwm_to_steering(msg.data[0])  # Steer
-        self.control_input[1] = 0.0002*convert_pwm_to_thrust(msg.data[1])*convert_pwm_to_thrust(msg.data[1])  # Thrust
+        self.control_input[0] = convert_pwm_to_steering(msg.data[0])  # Steer
+        self.control_input[1] = convert_pwm_to_thrust(msg.data[1])  # Thrust
         # print(self.control_input[1])
 
 
@@ -84,15 +84,26 @@ class ShipSimulator(Node):
         """Simulate the ship dynamics given the current state and control input."""
         M = 1.0  # Mass [kg]
         I = 1.0   # Inertial tensor [kg m^2]
-        Xu = 0.1#0.081
-        Xuu = 0.0
-        Nr = 0.081*2
-        Nrrr = 0.0
-        Yv = 0.06*2
-        Yvv = 0
-        Yr = 0.081*0.5
-        Nv = 0.081*0.5
-        dist = 0.3  # 30cm
+        # Xu = 0.1#0.081
+        # Xuu = 0.0
+        # Nr = 0.081*2
+        # Nrrr = 0.0
+        # Yv = 0.06*2
+        # Yvv = 0
+        # Yr = 0.081*0.5
+        # Nv = 0.081*0.5
+        # dist = 0.3  # 30cm
+        Xu = 0.10531
+        Xuu = 0.018405
+        Yv = 8.7185e-09
+        Yvv = 0.39199
+        Yr = 1.1508e-08
+        Nr = 9.1124e-08
+        Nrr = 5.2726
+        Nv = 6.1558e-09
+        b1=  0.00058466
+        b2 =  0.0040635
+        b3 =  0.31094
 
         # Extract states and controls
         psi, u, v, r = ship[2], ship[3], ship[4], ship[5]
@@ -148,9 +159,9 @@ class ShipSimulator(Node):
             u * np.cos(psi) - v * np.sin(psi),
             u * np.sin(psi) + v * np.cos(psi),
             r,
-            (thrust + u_dis - (Xu + Xuu * np.sqrt(u * u + eps)) * u) / M,
-            (v_dis - Yv * v - Yvv * np.sqrt(v * v + eps) * v - Yr * r) / M,
-            (steer * dist - (Nr + Nrrr * r * r) * r - Nv * v + N_wind_force + N_wave_force) / I
+            (b1*thrust*thrust*np.cos(b2*steer) - (Xu + Xuu * np.sqrt(u * u + eps)) * u) / M,
+            (b1*thrust*thrust*np.sin(b2*steer) - Yv * v - Yvv * np.sqrt(v * v + eps) * v - Yr * r) / M,
+            ( -b3*b1*thrust*thrust*np.sin(b2*steer) - (Nr + Nrr  * np.sqrt(r * r + eps)) * r - Nv * v) / I
         ])
 
     

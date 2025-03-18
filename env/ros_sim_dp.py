@@ -73,11 +73,11 @@ class ShipSimulator(Node):
         M = 1.0  # Mass [kg]
         I = 1.0   # Inertial tensor [kg m^2]
         Xu = 0.1#0.081
-        Xuu = 0.0
+        Xuu = 0.05
         Nr = 0.081*2
-        Nrrr = 0.0
+        Nrrr = 0.05
         Yv = 0.06*2
-        Yvv = 0
+        Yvv = 0.05
         Yr = 0.081*0.5
         Nv = 0.081*0.5
         dist = 0.3  # 30cm
@@ -120,25 +120,25 @@ class ShipSimulator(Node):
         Cy = CDt * np.sin(gamma) / (1 - delta * 0.5 * (1 - CDl / CDt) * (np.sin(2 * gamma))**2)
         Cn = -0.18 * (gamma - np.pi * 0.5) * Cy
 
-        X_wind_force = 0.0#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cx * Afw
-        Y_wind_force = 0.0#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cy * Alw
-        N_wind_force = 0.0#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cn * Alw * LOA
+        X_wind_force = 0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cx * Afw
+        Y_wind_force = 0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cy * Alw
+        N_wind_force = 0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cn * Alw * LOA
 
         U_wind_force = X_wind_force * np.cos(psi) + Y_wind_force * np.sin(psi)
         V_wind_force = -X_wind_force * np.sin(psi) + Y_wind_force * np.cos(psi)
 
-        u_dis = 0.0#U_wind_force + U_wave_force
-        v_dis = 0.0#V_wind_force + V_wave_force
-        N_wave_force = 0.0
+        u_dis = U_wind_force + U_wave_force
+        v_dis = V_wind_force + V_wave_force
+        # N_wave_force = 0.0
 
         # Dynamics calculation
         xdot = np.array([
             u * np.cos(psi) - v * np.sin(psi),
             u * np.sin(psi) + v * np.cos(psi),
             r,
-            (thrust + u_dis - (Xu + Xuu * np.sqrt(u * u + eps)) * u+ 0.1) / M,
-            (bow+v_dis - Yv * v - Yvv * np.sqrt(v * v + eps) * v - Yr * r + 0.2) / M,
-            (steer - (Nr + Nrrr * r * r) * r - Nv * v + N_wind_force + N_wave_force + 0.1) / I
+            (thrust + 0.1*u_dis - (Xu + Xuu * np.sqrt(u * u + eps)) * u) / M,
+            (bow+0.1*v_dis - Yv * v - Yvv * np.sqrt(v * v + eps) * v - Yr * r) / M,
+            (steer - (Nr + Nrrr * r * r) * r - Nv * v + 0.1*N_wind_force + 0.1*N_wave_force) / I
         ])
 
     
