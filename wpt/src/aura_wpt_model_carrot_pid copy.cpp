@@ -29,7 +29,7 @@ public:
         : Node("actuator_publisher"),
           k(0), x(0.0), y(0.0), u(0.0), v(0.0), r(0.0), Xu(0.10531), LLOS(0.0), psi(0.0), received_(false), ll_thrust(0.0), delta(50.0),
           acceptance_radius(8.0), Kp(300.0), Kd(2000.0), Kup(0.2), Kud(0.0), Kui(0.05), max_I(1), get_vel(0.0), n(0.0),
-          desired_velocity(0.0), max_steer(150.0), max_thrust(55), max_thrust_diff(2), max_steer_diff(10.0), before_proposed_thrust(0.0)
+          desired_velocity(0.0), max_steer(150.0), max_thrust(55), max_thrust_diff(0.01), max_steer_diff(10.0), before_proposed_thrust(0.0)
     {
         // RCLCPP_INFO(this->get_logger(), "Initializing ActuatorPublisher...");
 
@@ -177,56 +177,19 @@ private:
     void update_gains_based_on_velocity(double desired_velocity)
     {
         // Determine the index based on the integer value of desired_velocity
-        // int index = static_cast<int>(desired_velocity);  // Integer part of the velocity value
-        // // Ensure the index is within bounds (0 to 20)
-        // index = std::min(index, static_cast<int>(Kp_schedule.size()) - 1);
-        // // Set the gains based on the velocity
-        // Kp = Kp_schedule[index];
-        // Kd = Kd_schedule[index];
-        // max_steer = max_steer_schedule[index];
-        // max_steer_diff = max_steer_diff_schedule[index];
-        double du = desired_velocity*1.94384;
-        // Kp, Kd, Kui
-        if (du <= 10.0){
-            Kp = 500.0;
-            Kd = 1000.0;
-            max_steer = 150.0;
-            max_steer_diff = 7.0;
-            Kui = 0.05;
-            RCLCPP_INFO(this->get_logger(), "went in1");
-        }
-        else if (du > 10.0 && du <= 16.0 ){
-            Kp = -60.0*(du - 10) + 500.0;
-            Kd = 200.0;
-            max_steer = 150.0;
-            max_steer_diff = 15.0;
-            Kui = 0.05;
-            RCLCPP_INFO(this->get_logger(), "went in2");
-        }
-        else{
-            Kp = 140.0;
-            Kd = 200.0;
-            max_steer = 150.0;
-            max_steer_diff = 15.0;
-            Kui = 0.05;
-            RCLCPP_INFO(this->get_logger(), "went in3");
-        }
+        int index = static_cast<int>(desired_velocity);  // Integer part of the velocity value
 
-        // Kup
-        if (du <= 8.0){
-            Kup = 0.5;
-        }
-        else if (du > 8.0 && du <= 13.0 ){
-            Kup = -0.06*(du - 8.0) + 0.5;
-        }
-        else{
-            Kup = 0.2;
-        }        
-        // RCLCPP_INFO(this->get_logger(), "Desired velocity : %.2f", du);
+        // Ensure the index is within bounds (0 to 20)
+        index = std::min(index, static_cast<int>(Kp_schedule.size()) - 1);
+
+        // Set the gains based on the velocity
+        Kp = Kp_schedule[index];
+        Kd = Kd_schedule[index];
+        max_steer = max_steer_schedule[index];
+        max_steer_diff = max_steer_diff_schedule[index];
 
         // Optionally, log the updated values for debugging
-        RCLCPP_INFO(this->get_logger(), "Kp=%.2f, Kd=%.2f, max_steer=%.2f, max_steer_diff=%.2f", Kp, Kd, max_steer, max_steer_diff);
-        RCLCPP_INFO(this->get_logger(), "Kup=%.2f, Kui=%.2f", Kup, Kui);
+        RCLCPP_INFO(this->get_logger(), "Updated gains: Kp=%.2f, Kd=%.2f, max_steer=%.2f, max_steer_diff=%.2f", Kp, Kd, max_steer, max_steer_diff);
     }
 
     void timer_callback()
@@ -264,6 +227,12 @@ private:
                 x2 = waypoints[k+1].first;
                 y2 = waypoints[k+1].second;
             }
+            // else if (k == 0){
+            //     x1 = waypoints[waypoints.size()-1].first;
+            //     y1 = waypoints[waypoints.size()-1].second;
+            //     x2 = waypoints[0].first;
+            //     y2 = waypoints[0].second;
+            // }
             else if (k == waypoints.size()-1){             
                 x1 = waypoints[waypoints.size()-1].first;
                 y1 = waypoints[waypoints.size()-1].second;
@@ -312,21 +281,11 @@ private:
             velocity_e = u - desired_velocity;
             double proposed_thrust = 0.0;
             
-    
-            // Thrust Regulation
-            double safe_area = 30.0;
-            double waypoint_start_distance = std::sqrt((xo - x1)*(xo - x1) + (yo - y1)*(yo - y1));
-            // //Decrease mode 
-            if (waypoint_start_distance <= safe_area){
-                proposed_thrust = before_proposed_thrust;
-                RCLCPP_INFO(this->get_logger(), "##### proposed thrust ######");
-            }
-            else{
-                I_thrust = I_thrust + Kui*velocity_e * 0.1;
-                I_thrust = clamp(I_thrust, -1.5, 10.0);
-                proposed_thrust = (0.10531 * u - Kup * velocity_e - Kud*(velocity_e - before_velocity_e)*0.1 - I_thrust);  // Thrust calculation
-                before_proposed_thrust = proposed_thrust;
-            }
+
+            I_thrust = I_thrust + Kui*velocity_e * 0.1;
+            I_thrust = clamp(I_thrust, -1.5, 10.0);
+            proposed_thrust = (0.10531 * u - Kup * velocity_e - Kud*(velocity_e - before_velocity_e)*0.1 - I_thrust);  // Thrust calculation
+            before_proposed_thrust = proposed_thrust;            
 
             before_velocity_e = velocity_e;
  
@@ -337,20 +296,7 @@ private:
 
             double thrust_change = proposed_thrust - last_thrust;
             thrust_change = clamp(thrust_change, -max_thrust_diff, max_thrust_diff);
-            
-            double thrust = 0.0;
-            if (waypoint_start_distance <= safe_area){
-                thrust = 0.9*(1-0.1*(1 - std::exp(-0.1*nn)))*ll_thrust;
-                last_thrust = thrust;
-            }
-            else{
-                thrust = last_thrust + thrust_change;
-                last_thrust = thrust;
-                ll_thrust = thrust;
-                nn = 0;
-            }            
-            
-            // double thrust = last_thrust + thrust_change;
+            double thrust = last_thrust + thrust_change;
             // double remap_thrust = thrust/(0.00058466*std::cos(0.0040635*steer));
             double remap_thrust = thrust/(0.00058466);
             if (remap_thrust <= 0)

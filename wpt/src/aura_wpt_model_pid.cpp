@@ -27,7 +27,7 @@ public:
         : Node("actuator_publisher"),
           k(0), x(0.0), y(0.0), u(0.0), v(0.0), r(0.0), Xu(0.10531), LLOS(0.0), psi(0.0), received_(false), ll_thrust(0.0),
           acceptance_radius(8.0), Kp(300.0), Kd(2000.0), Kup(0.2), Kud(0.0), Kui(0.05), max_I(1), get_vel(0.0), n(0.0),
-          desired_velocity(0.0), max_steer(150.0), max_thrust(55), max_thrust_diff(0.01), max_steer_diff(10.0), before_proposed_thrust(0.0)
+          desired_velocity(0.0), max_steer(150.0), max_thrust(55), max_thrust_diff(2.0), max_steer_diff(10.0), before_proposed_thrust(0.0)
     {
         // RCLCPP_INFO(this->get_logger(), "Initializing ActuatorPublisher...");
 
@@ -175,19 +175,59 @@ private:
     void update_gains_based_on_velocity(double desired_velocity)
     {
         // Determine the index based on the integer value of desired_velocity
-        int index = static_cast<int>(desired_velocity);  // Integer part of the velocity value
+        // int index = static_cast<int>(desired_velocity);  // Integer part of the velocity value
 
-        // Ensure the index is within bounds (0 to 20)
-        index = std::min(index, static_cast<int>(Kp_schedule.size()) - 1);
+        // // Ensure the index is within bounds (0 to 20)
+        // index = std::min(index, static_cast<int>(Kp_schedule.size()) - 1);
 
-        // Set the gains based on the velocity
-        Kp = Kp_schedule[index];
-        Kd = Kd_schedule[index];
-        max_steer = max_steer_schedule[index];
-        max_steer_diff = max_steer_diff_schedule[index];
+        // // Set the gains based on the velocity
+        // Kp = Kp_schedule[index];
+        // Kd = Kd_schedule[index];
+        // max_steer = max_steer_schedule[index];
+        // max_steer_diff = max_steer_diff_schedule[index];
+        // Kp, Kd, Kui
+        double du = desired_velocity*1.94384;
+        // Kp, Kd, Kui
+        if (du <= 10.0){
+            Kp = 500.0;
+            Kd = 2200.0;
+            max_steer = 150.0;
+            max_steer_diff = 7.0;
+            Kui = 0.05;
+            RCLCPP_INFO(this->get_logger(), "went in1");
+        }
+        else if (du > 10.0 && du <= 16.0 ){
+            Kp = -60.0*(du - 10) + 500.0;
+            Kd = 2200.0;
+            max_steer = 150.0;
+            max_steer_diff = 15.0;
+            Kui = 0.05;
+            RCLCPP_INFO(this->get_logger(), "went in2");
+        }
+        else{
+            Kp = 140.0;
+            Kd = 2200.0;
+            max_steer = 150.0;
+            max_steer_diff = 15.0;
+            Kui = 0.05;
+            RCLCPP_INFO(this->get_logger(), "went in3");
+        }
+
+        // Kup
+        if (du <= 8.0){
+            Kup = 0.5;
+        }
+        else if (du > 8.0 && du <= 13.0 ){
+            Kup = -0.06*(du - 8.0) + 0.5;
+        }
+        else{
+            Kup = 0.2;
+        }        
+        // RCLCPP_INFO(this->get_logger(), "Desired velocity : %.2f", du);
 
         // Optionally, log the updated values for debugging
-        RCLCPP_INFO(this->get_logger(), "Updated gains: Kp=%.2f, Kd=%.2f, max_steer=%.2f, max_steer_diff=%.2f", Kp, Kd, max_steer, max_steer_diff);
+        RCLCPP_INFO(this->get_logger(), "Kp=%.2f, Kd=%.2f, max_steer=%.2f, max_steer_diff=%.2f", Kp, Kd, max_steer, max_steer_diff);
+        RCLCPP_INFO(this->get_logger(), "Kup=%.2f, Kui=%.2f", Kup, Kui);
     }
 
     void timer_callback()
