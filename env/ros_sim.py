@@ -31,7 +31,7 @@ class ShipSimulator(Node):
         self.ship_state = np.zeros(6)
         self.ship_state[0] = station_keeping_point[0]  # UTM X (easting)
         self.ship_state[1] = station_keeping_point[1]  # UTM Y (northing)
-        self.ship_state[2] = 3.141592 * 0.8  # Heading (orientation)
+        self.ship_state[2] = 92*3.141592/180  # Heading (orientation)
         self.control_input = np.zeros(2)  # [n1, n2]
         self.dt = 0.1  # Time step for the simulation
         self.disturbance_state = np.zeros((6))
@@ -42,6 +42,8 @@ class ShipSimulator(Node):
         # UTM and WGS84 projections for coordinate transformation
         self.utm_proj = pyproj.Proj(proj="utm", zone=52, datum="WGS84")  # Set UTM zone as 33 (change as necessary)
         self.wgs84_proj = pyproj.Proj(proj="latlong", datum="WGS84")
+
+        self.nn = 0.0
 
     def control_callback(self, msg):
         """Callback to update control input from the control node."""
@@ -143,25 +145,31 @@ class ShipSimulator(Node):
         Cy = CDt * np.sin(gamma) / (1 - delta * 0.5 * (1 - CDl / CDt) * (np.sin(2 * gamma))**2)
         Cn = -0.18 * (gamma - np.pi * 0.5) * Cy
 
-        X_wind_force = 0.0#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cx * Afw
-        Y_wind_force = 0.0#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cy * Alw
-        N_wind_force = 0.0#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cn * Alw * LOA
+        X_wind_force = 0.2#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cx * Afw
+        Y_wind_force = 0.1#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cy * Alw
+        N_wind_force = 0.1#0.5 * lau * (u_rel_wind**2 + v_rel_wind**2) * Cn * Alw * LOA
 
         U_wind_force = X_wind_force * np.cos(psi) + Y_wind_force * np.sin(psi)
         V_wind_force = -X_wind_force * np.sin(psi) + Y_wind_force * np.cos(psi)
 
-        u_dis = 0.0#U_wind_force + U_wave_force
-        v_dis = 0.0#V_wind_force + V_wave_force
-        N_wave_force = 0.0
+        u_dis = U_wind_force #+ U_wave_force
+        v_dis = V_wind_force #+ V_wave_force
+        r_dis = N_wind_force
+        
+
+        # u_dis = 0.5*np.sin(0.1*self.nn)
+        # v_dis = 0.7*np.cos(0.1*self.nn)#0.1*np.cos(0.02*self.nn)
+        # r_dis = 0.3*np.cos(0.1*self.nn)
+        self.nn += 1
 
         # Dynamics calculation
         xdot = np.array([
             u * np.cos(psi) - v * np.sin(psi),
             u * np.sin(psi) + v * np.cos(psi),
             r,
-            (b1*thrust*thrust*np.cos(b2*steer) - (Xu + Xuu * np.sqrt(u * u + eps)) * u) / M,
-            (b1*thrust*thrust*np.sin(b2*steer) - Yv * v - Yvv * np.sqrt(v * v + eps) * v - Yr * r) / M,
-            ( -b3*b1*thrust*thrust*np.sin(b2*steer) - (Nr + Nrr  * np.sqrt(r * r + eps)) * r - Nv * v) / I
+            (u_dis + b1*thrust*thrust*np.cos(b2*steer) - (Xu + Xuu * np.sqrt(u * u + eps)) * u) / M,
+            (v_dis + b1*thrust*thrust*np.sin(b2*steer) - Yv * v - Yvv * np.sqrt(v * v + eps) * v - Yr * r) / M,
+            (r_dis  -b3*b1*thrust*thrust*np.sin(b2*steer) - (Nr + Nrr  * np.sqrt(r * r + eps)) * r - Nv * v) / I
         ])
 
     

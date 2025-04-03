@@ -24,6 +24,23 @@ public:
 
     }    
 
+    static double smc_sat(double s) {
+        if (s >= 1)
+        {
+            return 1;
+
+        }
+        else if (s <=1 && s>= -1)
+        {
+            return s;
+        }
+        else
+        {
+            return -1;
+        }
+
+    }        
+
     static void L1_control(const std::array<double, 8>& state,
                            const std::array<double, 2>& state_estim,
                            std::array<double, 2>& param_filtered,
@@ -39,11 +56,11 @@ public:
         constexpr double M = 1;
         constexpr double I = 1;
         constexpr double Xu = 0.1;
-        constexpr double Xuu = 0.0;
+        constexpr double Xuu = 0.05;
         constexpr double Nr = 0.081*2;
-        constexpr double Nrrr = 0.0;
+        constexpr double Nrrr = 0.05;
         constexpr double Yv = 0.06*2;
-        constexpr double Yvv = 0;
+        constexpr double Yvv = 0.05;
         constexpr double Yr = 0.081*0.5;
         constexpr double Nv = 0.081*0.5;
         constexpr double dist = 0.3;
@@ -90,9 +107,13 @@ public:
         std::array<double, 2> adaptive_control = param_filtered;
 
         // Compute L1 thruster
-        L1_thruster[0] = adaptive_control[0] - 0.1*u - bow_switch(s_u);
+        L1_thruster[0] = adaptive_control[0] - 0.1*u - smc_sat(s_u) + Xuu * std::sqrt(u * u) * u;
 
-        L1_thruster[1] = adaptive_control[1] - 0.1*r - psi;
+        L1_thruster[1] = adaptive_control[1] - 0.1*r - psi + Nrrr * r * r * r;
+        
+        // L1_thruster[0] = adaptive_control[0] - 0.1*u - bow_switch(s_u);
+
+        // L1_thruster[1] = adaptive_control[1] - 0.1*r - psi;
 
         // Compute xdot
         std::array<double, 2> xdot = {

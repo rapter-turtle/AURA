@@ -18,9 +18,9 @@ class WaypointPublisher(Node):
         # Define square properties: center (latitude, longitude), width, height, and rotation angle
         self.center_lat = 37.1835000
         self.center_lon = 126.6395000
-        self.width_m = 150  # Width in meters
-        self.height_m = 50  # Height in meters
-        self.angle_deg = 60  # Rotation angle in degrees
+        self.width_m = 100  # Width in meters
+        self.height_m = 200  # Height in meters
+        self.angle_deg = 120  # Rotation angle in degrees
 
         # Compute the four corners of the rotated square
         self.wpt_x, self.wpt_y = self.compute_rotated_square_waypoints()

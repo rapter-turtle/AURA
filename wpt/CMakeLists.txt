@@ -25,7 +25,10 @@ include_directories(${GeographicLib_INCLUDE_DIRS})
 # include_directories(include)
 include_directories(include ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-
+install(
+  DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 # Specify Python executable
 install(PROGRAMS
@@ -33,6 +36,8 @@ install(PROGRAMS
   scripts/plccomm.py
   scripts/plc_test.py
   scripts/heron_map_gui.py
+  scripts/heron_map_gui_dock.py
+  scripts/wpt_pub_excel.py  
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -59,6 +64,10 @@ add_executable(ekf src/ekf_filter.cpp)
 ament_target_dependencies(ekf rclcpp aura_msg tf2 sensor_msgs geometry_msgs)     # CHANGE
 target_link_libraries(ekf ${GeographicLib_LIBRARIES})
 
+add_executable(carrot src/aura_wpt_model_carrot_pid.cpp)
+ament_target_dependencies(carrot rclcpp aura_msg tf2 sensor_msgs geometry_msgs)     # CHANGE
+target_link_libraries(carrot ${GeographicLib_LIBRARIES})
+
 # Add the executable
 add_executable(wpt_publisher src/Lawnmower_pub.cpp)
 # Link dependencies
@@ -69,6 +78,19 @@ ament_target_dependencies(wpt_publisher
 )
 target_link_libraries(wpt_publisher ${GeographicLib_LIBRARIES})
 
+add_executable(aura_wpt_unmodel_pid src/aura_wpt_unmodel_pid.cpp)
+ament_target_dependencies(aura_wpt_unmodel_pid rclcpp aura_msg tf2 sensor_msgs)     # CHANGE
+target_link_libraries(aura_wpt_unmodel_pid ${GeographicLib_LIBRARIES})
+
+add_executable(aura_wpt_model_pid src/aura_wpt_model_pid.cpp)
+ament_target_dependencies(aura_wpt_model_pid rclcpp aura_msg tf2 sensor_msgs)     # CHANGE
+target_link_libraries(aura_wpt_model_pid ${GeographicLib_LIBRARIES})
+
+add_executable(aura_wpt_l1 src/aura_wpt_model_L1.cpp)
+ament_target_dependencies(aura_wpt_l1 rclcpp aura_msg tf2 sensor_msgs)     # CHANGE
+target_link_libraries(aura_wpt_l1 ${GeographicLib_LIBRARIES})
+
+
 
 install(TARGETS
   talker
@@ -78,6 +100,10 @@ install(TARGETS
   ekf
   system_id
   dp
+  carrot
+  aura_wpt_l1
+  aura_wpt_model_pid
+  aura_wpt_unmodel_pid
   DESTINATION lib/${PROJECT_NAME})
 
 

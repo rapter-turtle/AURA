@@ -9,13 +9,11 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 
-
 #include <GeographicLib/UTMUPS.hpp>
 #include <cmath>
 #include <vector>
 #include <algorithm>
-
-
+ 
 template <typename T>
 constexpr const T& clamp(const T& value, const T& low, const T& high)
 {
@@ -27,9 +25,9 @@ class ActuatorPublisher : public rclcpp::Node
 public:
     ActuatorPublisher()
         : Node("actuator_publisher"),
-          k(0), x(0.0), y(0.0), u(0.0), v(0.0), r(0.0), Xu(0.10531), LLOS(0.0), psi(0.0), received_(false),
-          acceptance_radius(3.0), Kp(0.0), Kd(0.0), Kup(10.0), Kud(0.0), Kui(0.01), max_I(1),
-          desired_velocity(0.0), max_steer(100), max_thrust(70), max_thrust_diff(0.1), max_steer_diff(0.5)
+          k(0), x(0.0), y(0.0), u(0.0), v(0.0), r(0.0), Xu(0.10531), LLOS(0.0), psi(0.0), received_(false), ll_thrust(0.0),
+          acceptance_radius(8.0), Kp(300.0), Kd(2000.0), Kup(0.2), Kud(0.0), Kui(0.05), max_I(1), get_vel(0.0), n(0.0),
+          desired_velocity(0.0), max_steer(150.0), max_thrust(55), max_thrust_diff(0.01), max_steer_diff(10.0), before_proposed_thrust(0.0)
     {
         // RCLCPP_INFO(this->get_logger(), "Initializing ActuatorPublisher...");
 
@@ -86,7 +84,12 @@ private:
     void velocity_callback(const std_msgs::msg::Float64::SharedPtr msg)
     {
         // Extract yaw (psi) from quaternion
-        desired_velocity = msg->data/1.94384;
+        get_vel = msg->data/1.94384;
+
+        if (get_vel!= msg->data/1.94384)
+        {
+            n = 0.0;
+        }
         
     }    
 
@@ -206,6 +209,33 @@ private:
             double dy = target_wpt.second - y;
             double distance_to_wpt = std::sqrt(dx * dx + dy * dy);
 
+            double distance_before = 1000.0;
+            double distance_after = 1000.0;
+
+            double dx_before = waypoints[k-1].first - x;
+            double dy_before = waypoints[k-1].second - y;
+
+            double dx_after = waypoints[k+1].first - x;
+            double dy_after = waypoints[k+1].second - y;
+
+            if (k >= 1 && k < waypoints.size()-1)
+            {
+                distance_before = std::sqrt(dx_before * dx_before + dy_before * dy_before);
+                distance_after = std::sqrt(dx_after * dx_after + dy_after * dy_after);
+            }
+            else if (k == 0){
+                double dx_before = waypoints[waypoints.size()-1].first - x;
+                double dy_before = waypoints[waypoints.size()-1].second - y;
+                distance_before = std::sqrt(dx_before * dx_before + dy_before * dy_before);
+                distance_after = std::sqrt(dx_after * dx_after + dy_after * dy_after);                
+            }
+            else if (k == waypoints.size()-1){
+                double dx_after = waypoints[0].first - x;
+                double dy_after = waypoints[0].second - y;
+                distance_before = std::sqrt(dx_before * dx_before + dy_before * dy_before);
+                distance_after = std::sqrt(dx_after * dx_after + dy_after * dy_after);                
+            }
+
             if (psi > M_PI)
                 psi -= 2 * M_PI;
             else if (psi < -M_PI)
@@ -224,30 +254,29 @@ private:
             steer_input = clamp(steer_input, -max_steer, max_steer);
             before_error_angle = error_angle;
 
+
+            desired_velocity = get_vel*(1 - std::exp(-0.01*n))*(1 - 0.5*clamp((steer_input*steer_input)/150000, 0.0, 0.3));
             double velocity_e = 0.0;
-            //Decrease mode 
-            if (distance_to_wpt <= 10){
-                velocity_e = u - 0.8*desired_velocity;
+            velocity_e = u - desired_velocity;
+            double proposed_thrust = 0.0;
+            
+
+            // Thrust Regulation
+            double safe_area = 30.0;
+            // //Decrease mode 
+            if (distance_to_wpt <= safe_area || distance_before <= safe_area || distance_after <= safe_area){
+                proposed_thrust = before_proposed_thrust;
+                RCLCPP_INFO(this->get_logger(), "##### proposed thrust ######");        
+                // proposed_thrust = (0.10531 * u - Kup * velocity_e - Kud*(velocity_e - before_velocity_e)*0.1 - I_thrust); 
             }
             else{
-                velocity_e = u - desired_velocity;
+                I_thrust = I_thrust + Kui*velocity_e * 0.1;
+                I_thrust = clamp(I_thrust, -1.5, 10.0);
+                proposed_thrust = (0.10531 * u - Kup * velocity_e - Kud*(velocity_e - before_velocity_e)*0.1 - I_thrust);  // Thrust calculation
+                before_proposed_thrust = proposed_thrust;
             }
-
-            // velocity_e = u - desired_velocity;
-
             
-            I_thrust = I_thrust + Kui*velocity_e * 0.1;
-            
-            // I_thrust = clamp(I_thrust, -100.0, 100.0);
-            I_thrust = clamp(I_thrust, -1.5, 1.5);
-            // Xu: 0.10531
-            // Xuu: 0.018405
-            // b1: 0.00058466
-            // b2: 0.0040635
 
-            double proposed_thrust = (0.10531 * u + 0.018405*u*sqrt(u*u + 0.00001) - Kup * velocity_e - Kud * (velocity_e - before_velocity_e) - I_thrust);  // Thrust calculation
-
-            
             before_velocity_e = velocity_e;
 
             // Apply rate limiting
@@ -257,11 +286,22 @@ private:
 
             double thrust_change = proposed_thrust - last_thrust;
             thrust_change = clamp(thrust_change, -max_thrust_diff, max_thrust_diff);
-            double thrust = last_thrust + thrust_change;
-            double remap_thrust = thrust/(0.00058466*std::cos(0.0040635*steer));
+            double thrust = 0.0;
+            if (distance_to_wpt <= safe_area || distance_before <= safe_area || distance_after <= safe_area){
+                thrust = (1-0.1*(1 - std::exp(-0.1*nn)))*ll_thrust;
+                last_thrust = thrust;
+            }
+            else{
+                thrust = last_thrust + thrust_change;
+                last_thrust = thrust;
+                ll_thrust = thrust;
+                nn = 0;
+            }
+            // double remap_thrust = thrust/(0.00058466*std::cos(0.0040635*steer));
+            double remap_thrust = thrust/(0.00058466);
             if (remap_thrust <= 0)
             {
-                remap_thrust = sqrt(-remap_thrust);
+                remap_thrust = -sqrt(-remap_thrust);
             }
             else
             {
@@ -271,7 +311,7 @@ private:
 
             // Store the last commands
             last_steering = steer;
-            last_thrust = thrust;
+            
 
             remap_thrust = clamp(remap_thrust, 0.0, max_thrust);
             // Convert to PWM signals
@@ -284,9 +324,11 @@ private:
             actuator_msg.data.push_back(0.0);
             actuator_msg.data.push_back(0.0);
 
+            RCLCPP_INFO(this->get_logger(), "check=%.2f", clamp((steer_input*steer_input)/150000, 0.0, 0.3));
             RCLCPP_INFO(this->get_logger(), "WPT #=%d", k);
             RCLCPP_INFO(this->get_logger(), "steer=%.2f, thrust=%.2f", steer, remap_thrust);
-            RCLCPP_INFO(this->get_logger(), "LOS=%.2f, Distance=%.2f", LOS * 180 / M_PI, distance_to_wpt);
+            // RCLCPP_INFO(this->get_logger(), "LOS=%.2f", LOS * 180 / M_PI);
+            RCLCPP_INFO(this->get_logger(), "before=%.2f, now=%.2f, after=%.2f", distance_before, distance_to_wpt, distance_after);
             RCLCPP_INFO(this->get_logger(), "desired u =%.2f knots, u=%.2f m/s, %.2f knots", desired_velocity* 1.94384,u , u * 1.94384);
             RCLCPP_INFO(this->get_logger(), "Kp=%.2f, Kd=%.2f, max_steer=%.2f, max_steer_diff=%.2f",Kp, Kd, max_steer, max_steer_diff);
             RCLCPP_INFO(this->get_logger(), "I thrust=%.2f", I_thrust);
@@ -299,6 +341,9 @@ private:
                 k++;
                 RCLCPP_INFO(this->get_logger(), "Waypoint %zu reached. Moving to next waypoint.", k - 1);
             }
+
+            n = n + 1;
+            nn = nn + 1;
         }
     }
 
@@ -334,34 +379,35 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::vector<double> Kp_schedule = {
-        800.0, 800.0, 800.0, 800.0, 800.0, 800.0, 800.0, 800.0, 800.0, 800.0, 
-        300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 
-        300.0
+        500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 500.0, 
+        500.0, 400.0, 400.0, 400.0, 200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 
+        200.0
     };
 
     std::vector<double> Kd_schedule = {
         2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 
-        2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 2200.0, 
-        2200.0
+        2200.0, 2200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 
+        200.0
     };
 
     std::vector<double> max_steer_schedule = {
-        300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 
-        300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 
-        300.0
+        150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 
+        150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 150.0, 
+        150.0
     };
 
     std::vector<double> max_steer_diff_schedule = {
-        10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 
-        20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 
-        20.0
+        7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 
+        7.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 
+        15.0
     };
 
     // Data variables
     size_t k;
-    double x, y, psi, u, v, r, LLOS;
+    double x, y, psi, u, v, r, LLOS, n, nn;
     std::vector<std::pair<double, double>> waypoints;
-    double acceptance_radius, Kp, Kd, Kup, Kud, Kui, Xu, desired_velocity, max_thrust, max_steer, diff_thrust_before, before_error_angle, max_thrust_diff, max_steer_diff, last_steering, last_thrust, before_velocity_e, I_thrust, max_I;
+    double acceptance_radius, Kp, Kd, Kup, Kud, Kui, Xu, desired_velocity, max_thrust, max_steer, diff_thrust_before, before_error_angle, max_thrust_diff, max_steer_diff, last_steering, last_thrust, before_velocity_e, I_thrust, max_I, before_proposed_thrust;
+    double get_vel, ll_thrust;
     bool received_;
 };
 
