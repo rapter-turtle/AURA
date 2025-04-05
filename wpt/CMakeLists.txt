@@ -64,9 +64,17 @@ add_executable(ekf src/ekf_filter.cpp)
 ament_target_dependencies(ekf rclcpp aura_msg tf2 sensor_msgs geometry_msgs)     # CHANGE
 target_link_libraries(ekf ${GeographicLib_LIBRARIES})
 
+add_executable(ekf_px4 src/ekf_filter_px4.cpp)
+ament_target_dependencies(ekf_px4 rclcpp aura_msg tf2 sensor_msgs geometry_msgs)     # CHANGE
+target_link_libraries(ekf_px4 ${GeographicLib_LIBRARIES})
+
 add_executable(carrot src/aura_wpt_model_carrot_pid.cpp)
 ament_target_dependencies(carrot rclcpp aura_msg tf2 sensor_msgs geometry_msgs)     # CHANGE
 target_link_libraries(carrot ${GeographicLib_LIBRARIES})
+
+add_executable(aura_thrust src/aura_wpt_model_carrot_pid_thrust.cpp)
+ament_target_dependencies(aura_thrust rclcpp aura_msg tf2 sensor_msgs geometry_msgs)     # CHANGE
+target_link_libraries(aura_thrust ${GeographicLib_LIBRARIES})
 
 # Add the executable
 add_executable(wpt_publisher src/Lawnmower_pub.cpp)
@@ -98,12 +106,14 @@ install(TARGETS
   aura_wpt
   wpt_publisher
   ekf
+  ekf_px4
   system_id
   dp
   carrot
   aura_wpt_l1
   aura_wpt_model_pid
   aura_wpt_unmodel_pid
+  aura_thrust
   DESTINATION lib/${PROJECT_NAME})
 
 

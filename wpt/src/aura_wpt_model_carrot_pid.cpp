@@ -29,7 +29,7 @@ public:
         : Node("actuator_publisher"),
           k(0), x(0.0), y(0.0), u(0.0), v(0.0), r(0.0), Xu(0.10531), LLOS(0.0), psi(0.0), received_(false), ll_thrust(0.0), delta(50.0),
           acceptance_radius(8.0), Kp(300.0), Kd(2000.0), Kup(0.2), Kud(0.0), Kui(0.05), max_I(1), get_vel(0.0), n(0.0),
-          desired_velocity(0.0), max_steer(150.0), max_thrust(55), max_thrust_diff(2), max_steer_diff(10.0), before_proposed_thrust(0.0)
+          desired_velocity(0.0), max_steer(150.0), max_thrust(55), max_thrust_diff(0.01), max_steer_diff(10.0), before_proposed_thrust(0.0)
     {
         // RCLCPP_INFO(this->get_logger(), "Initializing ActuatorPublisher...");
 
