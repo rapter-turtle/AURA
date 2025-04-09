@@ -29,7 +29,7 @@ public:
         : Node("actuator_publisher"),
           k(0), x(0.0), y(0.0), u(0.0), v(0.0), r(0.0), Xu(0.10531), LLOS(0.0), psi(0.0), received_(false), ll_thrust(0.0), delta(50.0),
           acceptance_radius(8.0), Kp(300.0), Kd(2000.0), Kup(0.2), Kud(0.0), Kui(0.05), max_I(1), get_vel(0.0), n(0.0),
-          desired_velocity(0.0), max_steer(150.0), max_thrust(55), max_thrust_diff(0.01), max_steer_diff(10.0), before_proposed_thrust(0.0)
+          desired_velocity(0.0), max_steer(150.0), max_thrust(48), max_thrust_diff(0.01), max_steer_diff(10.0), before_proposed_thrust(0.0)
     {
         // RCLCPP_INFO(this->get_logger(), "Initializing ActuatorPublisher...");
 
@@ -282,7 +282,7 @@ private:
 
             distance_to_wpt = std::sqrt(dx * dx + dy * dy);
             double wpt_end_distance = std::sqrt((x - x2)*(x - x2) + (y - y2)*(y - y2));
-
+            delta = 50.0;///////////////////////////////////////////////////////////////////// safe area
             if (wpt_end_distance <= delta){
                 k = k + 1;
             }
@@ -307,14 +307,14 @@ private:
             before_error_angle = error_angle;
 
 
-            desired_velocity = get_vel*(1 - std::exp(-0.01*n))*(1 - 0.5*clamp((steer_input*steer_input)/150000, 0.0, 0.3));
+            desired_velocity = get_vel*(1 - std::exp(-0.01*n))*(1 - 0.5*clamp((steer_input*steer_input)/150000, 0.0, 0.06));
             double velocity_e = 0.0;
             velocity_e = u - desired_velocity;
             double proposed_thrust = 0.0;
             
     
             // Thrust Regulation
-            double safe_area = 30.0;
+            double safe_area = 40.0;    ///////////////////////////////////////////////////////////////////// safe area
             double waypoint_start_distance = std::sqrt((xo - x1)*(xo - x1) + (yo - y1)*(yo - y1));
             // //Decrease mode 
             if (waypoint_start_distance <= safe_area){
@@ -323,7 +323,7 @@ private:
             }
             else{
                 I_thrust = I_thrust + Kui*velocity_e * 0.1;
-                I_thrust = clamp(I_thrust, -1.5, 10.0);
+                I_thrust = clamp(I_thrust, -0.45, 10.0);
                 proposed_thrust = (0.10531 * u - Kup * velocity_e - Kud*(velocity_e - before_velocity_e)*0.1 - I_thrust);  // Thrust calculation
                 before_proposed_thrust = proposed_thrust;
             }
@@ -340,7 +340,7 @@ private:
             
             double thrust = 0.0;
             if (waypoint_start_distance <= safe_area){
-                thrust = 0.9*(1-0.1*(1 - std::exp(-0.1*nn)))*ll_thrust;
+                thrust = 1.0*(1-0.1*(1 - std::exp(-0.1*nn)))*ll_thrust;
                 last_thrust = thrust;
             }
             else{

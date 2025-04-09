@@ -56,14 +56,14 @@ class WaypointPublisher(Node):
 
         # Define pattern parameters
         self.distance = 5.0
-        self.width = 100.0
-        self.height = 150.0
-        self.num_patterns = 3
-        self.tilt_angle = 60.0
+        self.width = 100.0*2.0
+        self.height = 200.0*2.0
+        self.num_patterns = 2
+        self.tilt_angle = 180.0
 
         # Define the start point (latitude and longitude)        
-        self.start_lat = 37.1835000
-        self.start_lon = 126.6395000
+        self.start_lat = 37.1853766
+        self.start_lon = 126.6412587
 
         # Convert the start point to UTM
         self.wgs84_proj = Proj(proj='latlong', datum='WGS84')

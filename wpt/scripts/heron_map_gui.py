@@ -326,7 +326,7 @@ class SensorFusionEKF(Node):
             self.line2_m.set_data(self.time_data, self.u_sensor_data)
             self.line2.set_data(self.time_data, self.u_data)
             self.ax2.set_xlim(self.time_data[-1] - 20, self.time_data[-1])
-            self.ax2.set_ylim(-1, 5)
+            self.ax2.set_ylim(-1, 10.0)
 
             self.line3_m.set_data(self.time_data, self.v_sensor_data)
             self.line3.set_data(self.time_data, self.v_data)

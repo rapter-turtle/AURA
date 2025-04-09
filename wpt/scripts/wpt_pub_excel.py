@@ -17,7 +17,9 @@ class ExcelWaypointPublisher(Node):
         self.get_logger().info('Excel Waypoint Publisher Node started.')
 
         # Load waypoints from Excel (.xlsx)
-        self.excel_file = '/home/user/aura_ws/src/wpt/scripts/wpt.xlsx'  # <-- Set to your .xlsx file path
+        # self.excel_file = '/home/user/aura_ws/src/wpt/scripts/wpt.xlsx'  # <-- Set to your .xlsx file path
+        self.excel_file = '/home/user/aura_ws/src/wpt/scripts/wpt_square.xlsx'  
+        # self.excel_file = '/home/user/aura_ws/src/wpt/scripts/wpt_lm.xlsx'  
         self.read_excel_waypoints()
 
         # Coordinate conversion setup
