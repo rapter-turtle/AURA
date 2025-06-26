@@ -1,0 +1,14 @@
+float64 pred_num
+float64 sampling_time
+float64 cpu_time
+float64 ref_num
+float64 ref_dt
+float64 traj_x
+float64 traj_y
+float64 theta
+float64 a
+float64 b
+float64 c
+aura_msg/MPCState[] state
+aura_msg/MPCState[] ref
+aura_msg/ObsState[] obs
