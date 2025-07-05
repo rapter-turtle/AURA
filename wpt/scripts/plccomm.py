@@ -44,9 +44,14 @@ class ActuatorSubscriber(Node):
         # socket 생성해서
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-        throttle = self.cal_throttle(int(msg.data[1]))# throttle = int(msg.actuator[3])
+        throttle_raw = self.cal_throttle(int(msg.data[1]))# throttle = int(msg.actuator[3])
+        if throttle_raw <= 0:
+            throttle = -throttle_raw
+        else:
+            throttle = throttle_raw
+
         steering = self.cal_steering(int(msg.data[0]))# steering = int(msg.actuator[1])
-        clutch = self.cal_clutch(throttle)
+        clutch = self.cal_clutch(throttle_raw)
         # print("a")
 
         sock.sendto(self.plcPacket.makeWritePacket2(int(throttle), int(steering), int(clutch)), (self.plc_ip, self.plc_port))
@@ -117,18 +122,25 @@ class ActuatorSubscriber(Node):
     # 1750일때 50
 
     def cal_throttle(self, pwm):
-        if pwm <= 1550 : 
-            return 0 
+        if pwm <= 1450 and pwm >= 1000 : 
+            return (pwm-1450) * 0.26 
+        
+        elif pwm > 1450 and pwm < 1550:
+            return 0
+        
         elif pwm > 1550:
             return (pwm-1550) * 0.26 
+        
         else:
             return 0
 
     def cal_clutch(self, throttle):
-        if throttle < 3:
+        if throttle < 3 and throttle >= -3:
             return 0
-        else:
+        elif throttle >= 3:
             return 1
+        else:
+            return 2
 
 def main(args=None):
     rclpy.init(args=args)

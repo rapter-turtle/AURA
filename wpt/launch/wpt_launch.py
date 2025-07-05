@@ -14,11 +14,5 @@ def generate_launch_description():
             executable='ekf',
             name='ekf',
             output='screen'
-        ),
-        Node(
-            package='wpt',
-            executable='wpt_pub_excel.py',
-            name='wpt_pub_excel',
-            output='screen'
         )
     ])

@@ -15,8 +15,6 @@ from aura_msg.msg import Waypoint
 import os
 import threading
 import utm
-from gen_ref import *
-from aura_msg.msg import MPCTraj, ObsState
 
 #Duck Pond
 # x_actual_min = 352571.00
@@ -65,13 +63,6 @@ class SensorFusionEKF(Node):
         self.v_sensor_data = []
         self.r_sensor_data = []
 
-        self.pred_x = []
-        self.pred_y = []
-        self.ref_x = []
-        self.ref_y = []
-
-        self.obs_list = [0,0,0,0,0,0]
-
         self.x_map = 0.0
         self.y_map = 0.0
 
@@ -112,56 +103,12 @@ class SensorFusionEKF(Node):
         map_height, map_width = kaist_img.shape[:2]
         self.map_height = map_height
         self.map_width = map_width
-
-        self.plot_ref_num = 1000	
-        self.plot_ref_dt = 0.01
-        self.plot_traj_x = 0.0	
-        self.plot_traj_y = 0.0	
-        self.plot_theta = 0.0	
-        self.plot_a = 80	
-        self.plot_b = 80	
-        self.plot_c = 30
-
-
-        self.ref_dt = 0.01
-         # reference dt = 0.01 sec, 1000 sec trajectory generation
-        # self.reference = generate_figure_eight_trajectory_con(1000, self.ref_dt) # reference dt = 0.01 sec, 1000 sec trajectory generation
-        ship_state_x = (289577.66 + 291591.05)*0.5  # UTM X (easting)
-        ship_state_y = (4117065.30 + 4118523.52)*0.5  
-
-        traj_xy = (ship_state_x, ship_state_y)
-        self.traj_offset = np.array([0, 0])
-        # Generate the trajectory
-        trajectory_data = generate_figure_eight_trajectory(
-            1000,
-            self.ref_dt,
-            traj_xy,
-            np.pi/2
-        )
-        
-
-        map_traj_data = np.empty_like(trajectory_data)        
-        for i in range(trajectory_data.shape[0]):
-            pos_x, pos_y = trajectory_data[i, 0] + self.traj_offset[0], trajectory_data[i, 1] + self.traj_offset[1]
-            pos_x_map, pos_y_map = self.utm_to_map(pos_x, pos_y)
-            map_traj_data[i, 0] = pos_x_map
-            map_traj_data[i, 1] = pos_y_map    
-
-
-        self.refs, = self.ax1.plot(map_traj_data[:,0],map_traj_data[:,1],'k--',label='reference traj.')
-        self.ref_line, = self.ax1.plot([], [], 'b-', label='Reference')        
-        self.pred_line, = self.ax1.plot([], [], 'g-', label='Predicted')
-  
-
         self.ax1.imshow(kaist_img[::-1], origin='lower')
         self.ax1.grid()
         self.ax1.set_xlabel('x position')
         self.ax1.set_ylabel('y position')
         self.ax1.set_title('Real-time Trajectory Plot')
-        # self.ax1.legend()
-
-
-
+        self.ax1.legend()
 
         self.ax2 = plt.subplot2grid((3, 5), (0, 2), fig=self.fig)
         self.line2_m, = self.ax2.plot([], [], 'r-', label='measurement', alpha=0.75)
@@ -192,14 +139,12 @@ class SensorFusionEKF(Node):
         # self.line6_right, = self.ax6.plot([], [], 'g-', label='throttle')
         self.ax6.set_xlabel('Time')
         self.ax6.set_ylabel('Steering')
-        self.ax6.set_ylim([1000.0, 2000.0])
 
         self.ax7 = plt.subplot2grid((3, 5), (0, 4), fig=self.fig)
         # self.line7_left, = self.ax7.plot([], [], 'r-', label='steering')
         self.line7_right, = self.ax7.plot([], [], 'g-', label='throttle')
         self.ax7.set_xlabel('Time')
         self.ax7.set_ylabel('Throttle')
-        self.ax7.set_ylim([1000.0, 2000.0])
 
         self.ax8 = plt.subplot2grid((3, 5), (1, 4), fig=self.fig)
         self.line8_left, = self.ax8.plot([], [], 'r-', label='steering')
@@ -266,14 +211,6 @@ class SensorFusionEKF(Node):
 
         # Create the inset axes using plt.axes
         self.axins = plt.subplot2grid((3, 5), (2, 2), fig=self.fig)
-        self.pred_line_in, = self.axins.plot([], [], 'b-', label='Predicted')
-        self.ref_line_in, = self.axins.plot([], [], 'g-', label='Reference')   
-       
-        self.theta = np.linspace( 0 , 2 * np.pi , 150 )        
-        radius = 1.0
-        self.obs_a = self.ax1.fill(0.0 + radius * np.cos( self.theta ), 0.0 + radius * np.sin( self.theta ), color='red', alpha=0.3)
-        self.obs_b = self.ax1.fill(0.0 + radius * np.cos( self.theta ), 0.0 + radius * np.sin( self.theta ), color='red', alpha=0.3)
-
 
         # self.axins = plt.axes([0.35, 0.05, 0.34, 0.34])
         # self.axins.set_xticks([])
@@ -283,36 +220,40 @@ class SensorFusionEKF(Node):
         self.ekf_sub = self.create_subscription(Float64MultiArray, '/ekf/estimated_state', self.ekf_callback, 10)
         self.thrust_sub = self.create_subscription(Float64MultiArray, '/actuator_outputs', self.thrust_callback, 10)
         self.waypoint_sub = self.create_subscription(Waypoint, "/waypoints", self.waypoints_callback, 10)
-        self.mpc_sub = self.create_subscription( MPCTraj,'/mpc_vis', self.mpc_callback,10)
-        self.traj_sub = self.create_subscription(Float64MultiArray,'/mpc_traj',  self.traj_callback,10)
 
         reset_ax = plt.axes([0.41, 0.05, 0.05, 0.03])
         self.reset_button = Button(reset_ax, 'Reset')
         self.reset_button.on_clicked(self.reset_plots)
 
-    def utm_to_map(self,pos_x,pos_y):        
-        pos_x_map = (pos_x - x_actual_min)/(x_actual_max - x_actual_min)*self.map_width
-        pos_y_map = self.map_height-(pos_y - y_actual_min)/(y_actual_max - y_actual_min)*self.map_height        
-        return pos_x_map, pos_y_map
-    
 
     def traj_callback(self, msg):
         # Access trajectory generation parameters from the received Float64MultiArray
         data = msg.data  # Access the list of floats in the message
         if self.plot_traj != data :
-            # self.traj_offset = np.array([0, data[10]])  # Update based on message structure
-            # self.ref_dt = 0.1  # Time step for the reference trajectory
-        
-        
+            self.traj_offset = np.array([data[9], data[10]])  # Update based on message structure
+            self.ref_dt = data[1]  # Time step for the reference trajectory
+            
+            # Parameters for the snake-like S-shape trajectory
+            self.tfinal = data[0]  # Total time duration for the trajectory
+            self.translation = (0, 0)  # Translation offset for the trajectory
+            self.theta = data[2]  # Rotation angle in radians (90 degrees)
+            self.num_s_shapes = data[3]  # Number of S-shapes (sine wave cycles)
+            self.start_point = (data[4], data[5])  # Starting point of the trajectory
+            self.amplitude = data[6]  # Amplitude of the sine wave
+            self.wavelength = data[7]  # Wavelength of the sine wave
+            self.velocity = data[8]  # Desired constant velocity
+
             # Generate the trajectory using the updated parameters
-            trajectory_data = generate_figure_eight_trajectory_con(
-                self.plot_ref_num,	
-                self.plot_ref_dt,
-                (self.plot_traj_x, self.plot_traj_y),	
-                self.plot_theta,
-                self.plot_a,	
-                self.plot_b,	
-                self.plot_c     
+            trajectory_data = generate_snake_s_shape_trajectory(
+                self.tfinal,
+                self.ref_dt,
+                self.translation,
+                self.theta,
+                self.num_s_shapes,
+                self.start_point,
+                self.amplitude,
+                self.wavelength,
+                self.velocity
             )
 
             # Update the map trajectory data
@@ -325,7 +266,7 @@ class SensorFusionEKF(Node):
 
             # Update the reference trajectory plot
             self.refs.set_data(map_traj_data[:, 0], map_traj_data[:, 1])  # Update the main plot
-            # self.refszoom.set_data(map_traj_data[:, 0], map_traj_data[:, 1])  # Update the zoomed-in plot
+            self.refszoom.set_data(map_traj_data[:, 0], map_traj_data[:, 1])  # Update the zoomed-in plot
 
             # Redraw the plot to reflect the updated trajectory
             self.ax1.relim()
@@ -338,40 +279,6 @@ class SensorFusionEKF(Node):
             self.plot_traj = data
 
     def mpc_callback(self, msg):# - 주기가 gps callback 주기랑 같음 - gps data callback받으면 ekf에서 publish 하기때문        
-       
-       
-        self.plot_ref_num = msg.ref_num	
-        self.plot_ref_dt = msg.ref_dt
-        self.plot_traj_x = msg.traj_x	
-        self.plot_traj_y = msg.traj_y	
-        self.plot_theta = msg.theta
-        self.plot_a = msg.a	
-        self.plot_b = msg.b	
-        self.plot_c = msg.c       
-                   # Generate the trajectory using the updated parameters
-        trajectory_data = generate_figure_eight_trajectory_con(
-            self.plot_ref_num,	
-            self.plot_ref_dt,
-            (self.plot_traj_x, self.plot_traj_y),	
-            self.plot_theta,
-            self.plot_a,	
-            self.plot_b,	
-            self.plot_c     
-        )
-
-        # Update the map trajectory data
-        map_traj_data = np.empty_like(trajectory_data)
-        for i in range(trajectory_data.shape[0]):
-            pos_x, pos_y = trajectory_data[i, 0] + self.traj_offset[0], trajectory_data[i, 1] + self.traj_offset[1]
-            pos_x_map, pos_y_map = self.utm_to_map(pos_x, pos_y)
-            map_traj_data[i, 0] = pos_x_map
-            map_traj_data[i, 1] = pos_y_map
-
-        # Update the reference trajectory plot
-        self.refs.set_data(map_traj_data[:, 0], map_traj_data[:, 1])  # Update the main plot
-        # self.refszoom.set_data(map_traj_data[:, 0], map_traj_data[:, 1])  # Update the zoomed-in plot
-
-
         # Clear previous data
         self.pred_x.clear()
         self.pred_y.clear()
@@ -379,11 +286,10 @@ class SensorFusionEKF(Node):
         self.ref_y.clear()
         
         self.obs_list[0:2] = self.utm_to_map(msg.obs[0].x,msg.obs[0].y)
-        self.obs_list[2] = msg.obs[0].rad*0.5
+        self.obs_list[2] = msg.obs[0].rad
         self.obs_list[3:5] = self.utm_to_map(msg.obs[1].x,msg.obs[1].y)
-        self.obs_list[5] = msg.obs[1].rad*0.5
+        self.obs_list[5] = msg.obs[1].rad
 
-        
         # Extract predicted and reference trajectories
         for state in msg.state:
             pred_x, pred_y = self.utm_to_map(state.x,state.y)
@@ -394,8 +300,7 @@ class SensorFusionEKF(Node):
             ref_x, ref_y = self.utm_to_map(ref.x,ref.y)
             self.ref_x.append(ref_x)
             self.ref_y.append(ref_y)
-        # print(self.ref_y)
-
+        
     def thrust_callback(self, msg):  # - 주기가 gps callback 주기랑 같음 - gps data callback받으면 ekf에서 publish 하기때문
         self.steering = msg.data[0]
         self.throttle = msg.data[1]
@@ -450,9 +355,6 @@ class SensorFusionEKF(Node):
         if len(self.time_data) > 1:
             self.line1_m.set_data(self.x_sensor_data, self.y_sensor_data)
             self.line1.set_data(self.x_data, self.y_data)
-            self.pred_line.set_data(self.pred_x,self.pred_y)
-            self.ref_line.set_data(self.ref_x,self.ref_y)            
-
             # self.line1test.set_data(self.x_data[::20], self.y_data[::20])
             # self.ax1.set_xlim(530, 620)
             # self.ax1.set_ylim(230, 300)
@@ -480,10 +382,6 @@ class SensorFusionEKF(Node):
 
             self.heron_p4.remove()
             self.heron_p4 = self.ax1.arrow(self.x_map, self.y_map, direction[0], direction[1], head_width=0.1, head_length=0.1, fc='g', ec='g')
-
-            self.obs_a[0].set_xy(np.column_stack((self.obs_list[0] + self.obs_list[2] * np.cos( self.theta ), self.obs_list[1] + self.obs_list[2] * np.sin( self.theta ))))
-            self.obs_b[0].set_xy(np.column_stack((self.obs_list[3] + self.obs_list[5] * np.cos( self.theta ), self.obs_list[4] + self.obs_list[5] * np.sin( self.theta ))))
-
 
 
             # Remove old waypoint circles before drawing new ones
@@ -536,11 +434,6 @@ class SensorFusionEKF(Node):
             self.line9_left.set_data(self.time_data, self.steering_data)
             self.line9_right.set_data(self.time_data, self.throttle_data)
             self.ax9.set_xlim(self.time_data[-1] - 20, self.time_data[-1])                        
-
-
-            # self.line1_in.set_data(self.x_data, self.y_data)
-            self.pred_line_in.set_data(self.pred_x,self.pred_y)
-            self.ref_line_in.set_data(self.ref_x,self.ref_y) 
 
             self.ax1.relim()
             self.ax2.relim()
@@ -640,7 +533,6 @@ class SensorFusionEKF(Node):
         self.line8_right.set_data([], [])
         self.line9_left.set_data([], [])
         self.line9_right.set_data([], [])
-        self.refs.set_data([], [])
 
         self.ax1.relim()
         self.ax1.autoscale_view()

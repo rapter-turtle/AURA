@@ -126,10 +126,18 @@ private:
     void timer_callback()
     {
         {
+            
             if (psi > M_PI)
                 psi -= 2 * M_PI;
             else if (psi < -M_PI)
                 psi += 2 * M_PI;
+
+            LLOS = psi - Kud*M_PI/180.0;
+
+            if (LLOS > M_PI)
+                LLOS -= 2 * M_PI;
+            else if (LLOS < -M_PI)
+                LLOS += 2 * M_PI;
 
 
             // SI type
@@ -151,8 +159,8 @@ private:
                 else if (max_I == 1)
                 {
                     steer_input = max_steer;
-                    proposed_thrust = 0;
-                    if (last_thrust <= 0)
+                    proposed_thrust = Kui;
+                    if (last_thrust <= Kui)
                     {
                         max_I = 0;
                     }
@@ -161,11 +169,12 @@ private:
             }
             else if (acceptance_radius == 2) // zig-zag
             {  
+                // LLOS
                 if (max_I == 0)
                 {
                     steer_input = max_steer;
                     proposed_thrust = desired_velocity;
-                    if (psi >= Kp)
+                    if (LLOS >= Kp)
                     {
                         max_I = 1;
                     }
@@ -174,11 +183,32 @@ private:
                 {
                     steer_input = -max_steer;
                     proposed_thrust = desired_velocity;
-                    if (psi <= -Kp)
+                    if (LLOS <= -Kp)
                     {
                         max_I = 0;
                     }
                 }
+
+                // if (max_I == 0)
+                // {
+                //     steer_input = max_steer;
+                //     proposed_thrust = desired_velocity;
+                //     if (psi >= Kp)
+                //     {
+                //         max_I = 1;
+                //     }
+                // }
+                // else if (max_I == 1)
+                // {
+                //     steer_input = -max_steer;
+                //     proposed_thrust = desired_velocity;
+                //     if (psi <= -Kp)
+                //     {
+                //         max_I = 0;
+                //     }
+                // }
+                // RCLCPP_INFO(this->get_logger(), "steer input =%f, proposed thrust =%f", steer_input , proposed_thrust);
+           
             }
             else if (acceptance_radius == 3) // circle
             {  
@@ -191,19 +221,7 @@ private:
                 proposed_thrust = 0;
             }
 
-            // Apply constraints
-            // steer_input = clamp(steer_input, -max_steer, max_steer);
-
-            // if (proposed_thrust >= 0)
-            // {
-            //     proposed_thrust = sqrt(clamp(proposed_thrust, 0.0, max_thrust * max_thrust));
-            // }
-            // else
-            // {
-            //     proposed_thrust = sqrt(clamp(proposed_thrust, 0.0, max_thrust * max_thrust));
-            // }
-
-
+            RCLCPP_INFO(this->get_logger(), "steer input =%f, proposed thrust =%f", steer_input , proposed_thrust);
             // Apply rate limiting
             double steer_change = steer_input - last_steering;
             steer_change = clamp(steer_change, -max_steer_diff, max_steer_diff);
@@ -213,6 +231,7 @@ private:
             thrust_change = clamp(thrust_change, -max_thrust_diff, max_thrust_diff);
             double thrust = last_thrust + thrust_change;
 
+            RCLCPP_INFO(this->get_logger(), "steer =%f, thrust =%f", steer , thrust);
             // Store the last commands
             last_steering = steer;
             last_thrust = thrust;

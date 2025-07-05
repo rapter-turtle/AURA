@@ -5,11 +5,12 @@ from aura_msg.msg import Waypoint, Parameter
 from sensor_msgs.msg import Imu, NavSatFix
 from math import atan2, sqrt, pi, cos, sin, log
 from geographiclib.geodesic import Geodesic
+from aura_msg.msg import MPCTraj, MPCState, ObsState
 from pyproj import Transformer
 import cvxpy as cp
 import numpy as np
 import casadi as ca
-
+# self.mpcvis_pub = self.create_publisher(MPCTraj, '/mpc_vis', 10)
 
 def clamp(value, low, high):
     return max(low, min(value, high))
@@ -22,11 +23,12 @@ class ActuatorPublisher(Node):
         self.publisher_ = self.create_publisher(Float64MultiArray, '/actuator_outputs', 10)
 
         # Subscribers
-        self.create_subscription(Float64MultiArray, '/ship/utm', self.state_callback, 10)
+        self.create_subscription(MPCTraj, '/mpc_vis', self.state_callback, 10)
+        self.create_subscription(Float64MultiArray, '/ship/utm', self.utm_state_callback, 10)
         # self.create_subscription(Float64MultiArray, '/actuator_outputs', self.thrust_callback, 10)
 
         # Timer
-        self.timer_ = self.create_timer(1.0, self.timer_callback)
+        self.timer_ = self.create_timer(2.0, self.timer_callback)
 
         # Control parameters and state
         self.x = self.y = self.psi = self.u = self.v = self.r = 0.0
@@ -46,7 +48,9 @@ class ActuatorPublisher(Node):
 
     def state_callback(self, msg):
         self.count = self.count + 1
-
+        
+    def utm_state_callback(self, msg):
+        self.count = self.count + 1
 
 
     def convert_steering_to_pwm(self, steer):
@@ -68,7 +72,7 @@ class ActuatorPublisher(Node):
 
 
     def timer_callback(self):
-        if self.count <= 5:
+        if self.count <= 2:
             pwm_steer = self.convert_steering_to_pwm(0.0)
             pwm_thrust = self.convert_thrust_to_pwm(0.0)
 
